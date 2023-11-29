@@ -66,7 +66,7 @@ public:
 	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 
-private:
+protected:
 	std::unordered_map<std::string_view, UserPtr> users_;
 	mutable std::shared_mutex mutex_;
 };
