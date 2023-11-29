@@ -59,7 +59,8 @@ public:
 	virtual void onMessage(Message&& message) {}
 
 	virtual void onDisconnect(Disconnect&& disconnect) {}
-	virtual void onEmpty() {}
+
+	// virtual void onEmpty() {}
 
 
 
@@ -92,6 +93,7 @@ public:
 			default:
 				return;
 		}
+
 		Message message(std::move(msg), room_.get(conn), conn);
 		onMessage(std::move(message));
 	}
@@ -100,6 +102,19 @@ public:
 	{
 		Disconnect disconnect(room_.remove(conn));
 		onDisconnect(std::move(disconnect));
+	}
+
+
+
+	static inline void notify(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		room_.notify(conn, msg, type);
+	}
+	static inline void notify(const drogon::WebSocketConnectionPtr& conn, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		room_.notify(conn, msg, len, type);
 	}
 
 	static inline void notify(const UserPtr& user, const std::string& msg,
@@ -113,16 +128,7 @@ public:
 		room_.notify(user, msg, len, type);
 	}
 
-	static inline void notify(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
-	{
-		room_.notify(conn, msg, type);
-	}
-	static inline void notify(const drogon::WebSocketConnectionPtr& conn, const char* msg,
-		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
-	{
-		room_.notify(conn, msg, len, type);
-	}
+
 
 	static inline void notifyAll(const std::string& msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
@@ -134,6 +140,8 @@ public:
 	{
 		room_.notifyAll(msg, len, type);
 	}
+
+
 
 	static inline void notifyAllExcept(const UserPtr& user, const std::string& msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
