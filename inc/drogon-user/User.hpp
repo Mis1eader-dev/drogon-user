@@ -1,0 +1,260 @@
+#pragma once
+
+#include "drogon/WebSocketConnection.h"
+#include "drogon/utils/FunctionTraits.h"
+#include "drogon/utils/Utilities.h"
+#include <any>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <shared_mutex>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+
+class User;
+using UserPtr = std::shared_ptr<User>;
+
+namespace drogon::user
+{
+	using IdGenerator = std::function<void (std::string& id)>;
+	using IdEncoder = std::function<void (std::string& idUnencoded)>;
+
+#ifdef ENABLE_OFFLINE_CALLBACK
+	/// This callback is called when a user object is destroyed in memory,
+	/// and considered offline.
+	using OfflineUserCallback = std::function<void (UserPtr user)>;
+#endif
+
+	/// This callback is called by a [/login] endpoint to validate a client's identity.
+	///
+	/// The 2nd argument is any extra information needed by the callback, say User-Agent,
+	/// IP address, etc. It can be ignored if not used.
+	///
+	/// A sample callback may look like:
+	/// string_view salt;
+	/// auto userData = dbQuery(identifier);
+	/// if(!userData.exists())
+	/// 	salt = dummySalt;
+	/// else
+	/// 	salt = userData.salt;
+	///
+	/// auto hashPass = hash(password, salt);
+	/// if(hashCompare(userData.hashedPassword, hashPass) != 0)
+	/// 	return {};
+	///
+	/// return std::move(userData);
+	using DatabaseLoginValidationCallback = std::function<std::any (std::string_view identifier, std::string_view password, const std::any& extraContext)>;
+
+	/// This callback is called when the user ID (session ID) does not exist in memory, and
+	/// it validates the session ID with the database to confirm it is a valid identity.
+	///
+	/// The 2nd argument is any extra information needed by the callback, say User-Agent,
+	/// IP address, etc. It can be ignored if not used.
+	///
+	/// A sample callback may look like:
+	/// auto userData = dbQuery("sessions", sessionId);
+	/// if(!userData.exists())
+	/// 	return {};
+	///
+	/// return std::move(userData);
+	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, const std::any& extraContext)>;
+
+	/// This callback is called by the Logged In filters.
+	using IdValidator = std::function<bool (std::string_view id)>;
+
+	/// This callback is called after the user identity is validated, either through login or
+	/// session validation.
+	///
+	/// It can be used to perform further queries if needed, create objects, or do nothing if
+	/// the objects are already in memory.
+	///
+	/// A sample callback may look like:
+	/// auto user = new User(sessionId, data.name, data.age);
+	/// drogon::user::add(user);
+	///
+	/// auto groupID = data.groupID;
+	/// auto group = BusinessLogic::getGroup(groupID);
+	/// if(group)
+	/// 	return;
+	///
+	/// groupData = dbQuery("groups", groupID);
+	/// if(!groupData.exists())
+	/// 	return;
+	///
+	/// group = new Group(groupID, groupData.name, user, groupData.color);
+	/// BusinessLogic::addGroup(group);
+	using DatabasePostValidationCallback = std::function<void (std::string_view sessionId, const std::any& data, const UserPtr& user)>;
+
+	/// This callback is called just before sending login info or session ID for
+	/// validation.
+	///
+	/// A sample callback may look like:
+	/// auto agent = req->getHeader("User-Agent");
+	/// auto ip = req->peerAddr().toIp();
+	/// auto extraContext = std::make_pair(agent, ip);
+	/// return extraContext;
+	using ExtraContextGenerator = std::function<std::any (const drogon::HttpRequestPtr& req)>;
+
+	/// This callback is called after a successful login.
+	///
+	/// A sample callback may look like:
+	/// dbWrite("sessions", id);
+	using DatabaseLoginWriteCallback = std::function<void (const std::string& id, const std::any& data)>;
+
+	void configure(
+		std::string_view idCookieKey = "ID",
+		int maxAge = 86400,
+		double userCacheTimeout = 20.0
+	);
+	void configure(
+		std::string_view idCookieKey,
+		int maxAge,
+		double userCacheTimeout,
+		uint8_t idCookieUnencodedLen,
+		IdGenerator&& idGenerator
+	);
+	void configure(
+		std::string_view idCookieKey,
+		int maxAge,
+		double userCacheTimeout,
+		uint8_t idCookieUnencodedLen,
+		uint8_t idCookieEncodedLen,
+		IdGenerator&& idGenerator
+	);
+	void configure(
+		std::string_view idCookieKey,
+		int maxAge,
+		double userCacheTimeout,
+		uint8_t idCookieUnencodedLen,
+		IdGenerator&& idGenerator,
+		IdEncoder&& idEncoder
+	);
+	void configure(
+		std::string_view idCookieKey,
+		int maxAge,
+		double userCacheTimeout,
+		uint8_t idCookieUnencodedLen,
+		uint8_t idCookieEncodedLen,
+		IdGenerator&& idGenerator,
+		IdEncoder&& idEncoder
+	);
+
+	void configureDatabase(
+		DatabaseLoginValidationCallback loginValidationCallback,
+		DatabaseSessionValidationCallback sessionValidationCallback,
+		DatabaseLoginWriteCallback loginWriteCallback,
+
+		/// Can be set to `nullptr` if no validation is desired.
+		///
+		/// NOTE: Even if set to `nullptr`, the length is still checked.
+		IdValidator idValidator = drogon::utils::isBase64,
+
+		ExtraContextGenerator extraContextGenerator = nullptr,
+		DatabasePostValidationCallback postValidationCallback = nullptr,
+		const std::string& identifierHeaderName = "email",
+		uint8_t minimumIdentifierLength = 3,
+		uint8_t maximumIdentifierLength = 254,
+		const std::string& passwordHeaderName = "password",
+		uint8_t minimumPasswordLength = 8,
+		uint8_t maximumPasswordLength = 128,
+		const std::string& loginValidationEndpoint = "/api/login",
+
+		/// Set to empty to disable redirect from unauthorized pages
+		const std::string& loginPageUrl = "/login",
+
+		/// Set to empty to disable redirect from login page when already logged in
+		const std::string& loggedInPageUrl = "/admin"
+	);
+
+#ifdef ENABLE_OFFLINE_CALLBACK
+	void setOfflineUserCallback(OfflineUserCallback cb);
+#endif
+
+	std::string generateId();
+	void generateId(std::string& id);
+	void generateIdFor(const drogon::HttpResponsePtr& resp);
+	void generateIdFor(const drogon::HttpResponsePtr& resp, const std::string& id);
+
+	std::string_view getId(const drogon::HttpRequestPtr& req);
+}
+
+class Room;
+
+class User
+{
+private:
+	const std::string id_;
+	std::shared_ptr<void> contextPtr_;
+
+	using ConnsSet = std::unordered_set<drogon::WebSocketConnectionPtr>;
+	std::unordered_map<Room*, ConnsSet> conns_;
+	mutable std::shared_mutex mutex_;
+
+	friend class Room;
+
+	static UserPtr create(std::string_view id, const drogon::WebSocketConnectionPtr& conn, Room* room);
+
+	static void enqueueForPurge(std::string_view id);
+
+public:
+	User(const std::string& id);
+	User(const std::string& id, const drogon::WebSocketConnectionPtr& conn, Room* room);
+
+	User(const User&) = delete;
+	User& operator = (const User&) = delete;
+
+	/// This must only be called if the user is not in memory,
+	/// and user's presence in memory is needed in that instant.
+	static UserPtr create(std::string_view id);
+
+	static UserPtr get(std::string_view id);
+	static UserPtr get(const drogon::HttpRequestPtr& req);
+
+	std::string_view id() const;
+
+	/**
+	 * @brief Set custom data on the connection
+	 *
+	 * @param context The custom data.
+	 */
+	void setContext(const std::shared_ptr<void>& context);
+
+	/**
+	 * @brief Set custom data on the connection
+	 *
+	 * @param context The custom data.
+	 */
+	void setContext(std::shared_ptr<void>&& context);
+
+	/**
+	 * @brief Get custom data from the connection
+	 *
+	 * @tparam T The type of the data
+	 * @return std::shared_ptr<T> The smart pointer to the data object.
+	 */
+	template <typename T>
+	std::shared_ptr<T> getContext() const
+	{
+		return std::static_pointer_cast<T>(contextPtr_);
+	}
+
+	/**
+	 * @brief Get the custom data reference from the connection.
+	 * @note Please make sure that the context is available.
+	 * @tparam T The type of the data stored in the context.
+	 * @return T&
+	 */
+	template <typename T>
+	T &getContextRef() const
+	{
+		return *(static_cast<T *>(contextPtr_.get()));
+	}
+
+	/// Return true if the context is set by user.
+	bool hasContext();
+
+	/// Clear the context.
+	void clearContext();
+};
