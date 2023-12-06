@@ -264,7 +264,7 @@ void Room::notify(const UserPtr& user, const char* msg,
 		return;
 
 	for(const WebSocketConnectionPtr& conn : find->second)
-		conn->send(msg, len, type);
+		notify(conn, msg, len, type);
 }
 
 void Room::notifyAll(const string& msg,
