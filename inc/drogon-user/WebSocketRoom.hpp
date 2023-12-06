@@ -164,4 +164,11 @@ public:
 	{
 		room_.notifyAllExcept(conn, msg, len, type);
 	}
+
+
+
+	static inline Room& room()
+	{
+		return room_;
+	}
 };
