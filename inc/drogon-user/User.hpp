@@ -4,9 +4,11 @@
 #include "drogon/utils/FunctionTraits.h"
 #include "drogon/utils/Utilities.h"
 #include <any>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -192,6 +194,9 @@ private:
 	std::unordered_map<Room*, ConnsSet> conns_;
 	mutable std::shared_mutex mutex_;
 
+	mutable std::condition_variable initCv_;
+	mutable std::mutex initMutex_;
+
 	friend class Room;
 #ifdef ENABLE_GROUPS
 	friend class Group;
@@ -237,9 +242,14 @@ public:
 	 * @tparam T The type of the data
 	 * @return std::shared_ptr<T> The smart pointer to the data object.
 	 */
-	template <typename T>
+	template<typename T>
 	std::shared_ptr<T> getContext() const
 	{
+		std::unique_lock lock(initMutex_);
+		initCv_.wait(lock, [this]() -> bool
+		{
+			return hasContext();
+		});
 		return std::static_pointer_cast<T>(contextPtr_);
 	}
 
@@ -249,14 +259,19 @@ public:
 	 * @tparam T The type of the data stored in the context.
 	 * @return T&
 	 */
-	template <typename T>
-	T &getContextRef() const
+	template<typename T>
+	T& getContextRef() const
 	{
+		std::unique_lock lock(initMutex_);
+		initCv_.wait(lock, [this]() -> bool
+		{
+			return hasContext();
+		});
 		return *(static_cast<T *>(contextPtr_.get()));
 	}
 
 	/// Return true if the context is set by user.
-	bool hasContext();
+	bool hasContext() const;
 
 	/// Clear the context.
 	void clearContext();

@@ -424,15 +424,17 @@ string_view User::id() const
 void User::setContext(const std::shared_ptr<void>& context)
 {
 	contextPtr_ = context;
+	initCv_.notify_all();
 }
 
 void User::setContext(std::shared_ptr<void>&& context)
 {
 	contextPtr_ = std::move(context);
+	initCv_.notify_all();
 }
 
 /// Return true if the context is set by user.
-bool User::hasContext()
+bool User::hasContext() const
 {
 	return (bool)contextPtr_;
 }
