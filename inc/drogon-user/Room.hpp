@@ -44,27 +44,39 @@ public:
 		conn->send(msg, len, type);
 	}
 
-	void notify(const UserPtr& user, const std::string& msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notify(const UserPtr& user, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(user, msg.data(), msg.size(), type);
+	}
 	void notify(const UserPtr& user, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 
 
 
-	void notifyAll(const std::string& msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAll(const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAll(msg.data(), msg.size(), type);
+	}
 	void notifyAll(const char* msg, uint64_t len,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 
 
 
-	void notifyAllExcept(const UserPtr& user, const std::string& msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAllExcept(const UserPtr& user, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(user, msg.data(), msg.size(), type);
+	}
 	void notifyAllExcept(const UserPtr& user, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 
-	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(conn, msg.data(), msg.size(), type);
+	}
 	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 

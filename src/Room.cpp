@@ -249,11 +249,6 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 	return std::move(user);
 }
 
-void Room::notify(const UserPtr& user, const string& msg,
-	const WebSocketMessageType type)
-{
-	notify(user, msg.data(), msg.size(), type);
-}
 void Room::notify(const UserPtr& user, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
@@ -267,11 +262,6 @@ void Room::notify(const UserPtr& user, const char* msg,
 		notify(conn, msg, len, type);
 }
 
-void Room::notifyAll(const string& msg,
-	const WebSocketMessageType type)
-{
-	notifyAll(msg.data(), msg.size(), type);
-}
 void Room::notifyAll(const char* msg, uint64_t len,
 	const WebSocketMessageType type)
 {
@@ -280,11 +270,6 @@ void Room::notifyAll(const char* msg, uint64_t len,
 		notify(user, msg, len, type);
 }
 
-void Room::notifyAllExcept(const UserPtr& user, const string& msg,
-	const WebSocketMessageType type)
-{
-	notifyAllExcept(user, msg.data(), msg.size(), type);
-}
 void Room::notifyAllExcept(const UserPtr& user, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
@@ -305,11 +290,6 @@ void Room::notifyAllExcept(const UserPtr& user, const char* msg,
 		notify(it->second, msg, len, type);
 }
 
-void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const string& msg,
-	const WebSocketMessageType type)
-{
-	notifyAllExcept(conn, msg.data(), msg.size(), type);
-}
 void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
