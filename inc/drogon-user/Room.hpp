@@ -29,6 +29,9 @@ private:
 	>
 	friend class WebSocketRoom;
 	friend class User;
+#ifdef ENABLE_GROUPS
+	friend class Group;
+#endif
 
 public:
 	Room();
