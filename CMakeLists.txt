@@ -33,8 +33,8 @@ set(USE_SUBMODULE ON)
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_BUILD_TYPE Release)
 
-option(ENABLE_OFFLINE_CALLBACK "Allows setting offline user callbacks" OFF)
-option(ENABLE_IDENTIFIER_MAP "Adds identifier map lookup within rooms" OFF)
+option(ENABLE_OFFLINE_CALLBACK "Adds offline user callback. NOTE: If enabled, it must be set before `drogon::app()::run()`, by calling `drogon::user::setOfflineUserCallback(...)`, otherwise it throws" OFF)
+option(ENABLE_IDENTIFIER_MAP "Adds identifier map lookup capability within rooms" OFF)
 
 # Dependencies
 

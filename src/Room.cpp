@@ -79,10 +79,9 @@ void User::enqueueForPurge(string_view id)
 				[id]()
 				{
 				#ifdef ENABLE_OFFLINE_CALLBACK
-					if(user::offlineUserCallback_)
-						user::offlineUserCallback_(
-							std::move(get(id))
-						);
+					user::offlineUserCallback_(
+						std::move(get(id))
+					);
 				#endif
 
 					// User becomes offline here
