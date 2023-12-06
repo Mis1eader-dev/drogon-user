@@ -193,6 +193,9 @@ private:
 	mutable std::shared_mutex mutex_;
 
 	friend class Room;
+#ifdef ENABLE_GROUPS
+	friend class Group;
+#endif
 
 	static UserPtr create(std::string_view id, const drogon::WebSocketConnectionPtr& conn, Room* room);
 
