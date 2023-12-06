@@ -31,6 +31,8 @@ private:
 	friend class User;
 
 public:
+	Room();
+
 	inline void notify(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{

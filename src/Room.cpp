@@ -31,6 +31,10 @@ namespace drogon::user
 #endif
 }
 
+Room::Room() :
+	users_()
+{}
+
 Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
 	users_(users)
 {}
