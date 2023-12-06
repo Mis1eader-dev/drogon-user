@@ -313,8 +313,8 @@ void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const char* msg,
 			++it;
 			break;
 		}
-		cur->send(msg, len, type);
+		notify(cur, msg, len, type);
 	}
 	for(; it != end; ++it)
-		(*it)->send(msg, len, type);
+		notify(*it, msg, len, type);
 }
