@@ -31,6 +31,10 @@ namespace drogon::user
 #endif
 }
 
+Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
+	users_(users)
+{}
+
 UserPtr User::create(string_view id)
 {
 	UserPtr user = std::make_shared<User>(string(id));
@@ -91,7 +95,7 @@ void User::enqueueForPurge(string_view id)
 	);
 }
 
-UserPtr User::get(std::string_view id)
+UserPtr User::get(string_view id)
 {
 	shared_lock lock(::mutex_);
 	auto find = ::allUsers_.find(id);

@@ -69,4 +69,6 @@ public:
 protected:
 	std::unordered_map<std::string_view, UserPtr> users_;
 	mutable std::shared_mutex mutex_;
+
+	Room(std::unordered_map<std::string_view, UserPtr>&& users);
 };
