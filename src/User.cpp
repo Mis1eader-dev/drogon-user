@@ -18,6 +18,10 @@
 #include <thread>
 #include <uuid/uuid.h>
 
+#ifdef ENABLE_OFFLINE_CALLBACK
+#include <vector>
+#endif
+
 using namespace drogon;
 using std::string;
 using std::string_view;
@@ -28,7 +32,7 @@ namespace drogon::user
 	extern double userCacheTimeout_;
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-	extern OfflineUserCallback offlineUserCallback_;
+	extern std::vector<OfflineUserCallback> offlineUserCallbacks_;
 #endif
 }
 
@@ -221,9 +225,9 @@ void user::configureDatabase(
 }
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-void user::setOfflineUserCallback(OfflineUserCallback cb)
+void user::registerOfflineUserCallback(OfflineUserCallback cb)
 {
-	offlineUserCallback_ = cb;
+	offlineUserCallbacks_.push_back(std::move(cb));
 }
 #endif
 

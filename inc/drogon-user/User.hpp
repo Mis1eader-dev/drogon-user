@@ -24,9 +24,9 @@ namespace drogon::user
 	using IdEncoder = std::function<void (std::string& idUnencoded)>;
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-	/// This callback is called when a user object is destroyed in memory,
+	/// This callback is called when a user object is to be destroyed in memory,
 	/// and considered offline.
-	using OfflineUserCallback = std::function<void (UserPtr user)>;
+	using OfflineUserCallback = std::function<void (const UserPtr& user)>;
 #endif
 
 	/// This callback is called by a [/login] endpoint to validate a client's identity.
@@ -171,7 +171,7 @@ namespace drogon::user
 	);
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-	void setOfflineUserCallback(OfflineUserCallback cb);
+	void registerOfflineUserCallback(OfflineUserCallback cb);
 #endif
 
 	std::string generateId();
@@ -183,6 +183,11 @@ namespace drogon::user
 }
 
 class Room;
+
+#ifdef ENABLE_GROUPS
+class Group;
+using GroupPtr = std::shared_ptr<Group>;
+#endif
 
 class User
 {
@@ -198,7 +203,11 @@ private:
 	mutable std::mutex initMutex_;
 
 	friend class Room;
+
 #ifdef ENABLE_GROUPS
+	std::unordered_map<size_t, GroupPtr> groups_;
+	mutable std::shared_mutex groupsMutex_;
+
 	friend class Group;
 #endif
 
@@ -275,4 +284,13 @@ public:
 
 	/// Clear the context.
 	void clearContext();
+
+
+
+#ifdef ENABLE_GROUPS
+	/// If `sizePredicate` is 0, then if not empty, it returns the first group (from groups.begin()).
+	///
+	/// Else, it returns groups.begin() only when the size of groups is exactly the predicate.
+	GroupPtr firstGroup(size_t sizePredicate = 0) const;
+#endif
 };

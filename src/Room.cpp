@@ -10,6 +10,10 @@
 #include <unordered_map>
 #include <utility>
 
+#ifdef ENABLE_OFFLINE_CALLBACK
+#include <vector>
+#endif
+
 using namespace drogon;
 using std::string;
 using std::string_view;
@@ -27,7 +31,7 @@ namespace drogon::user
 	double userCacheTimeout_;
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-	OfflineUserCallback offlineUserCallback_ = nullptr;
+	std::vector<OfflineUserCallback> offlineUserCallbacks_;
 #endif
 }
 
@@ -36,7 +40,7 @@ Room::Room() :
 {}
 
 Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
-	users_(users)
+	users_(std::move(users))
 {}
 
 UserPtr User::create(string_view id)
@@ -78,16 +82,20 @@ void User::enqueueForPurge(string_view id)
 				user::userCacheTimeout_,
 				[id]()
 				{
-				#ifdef ENABLE_OFFLINE_CALLBACK
-					user::offlineUserCallback_(
-						std::move(get(id))
-					);
-				#endif
-
-					// User becomes offline here
 					{
-						scoped_lock lock(::mutex_);
-						::allUsers_.erase(id);
+					#ifdef ENABLE_OFFLINE_CALLBACK
+						UserPtr user = get(id);
+					#endif
+
+						{
+							scoped_lock lock(::mutex_);
+							::allUsers_.erase(id);
+						}
+
+					#ifdef ENABLE_OFFLINE_CALLBACK
+						for(const auto& cb : user::offlineUserCallbacks_)
+							cb(user);
+					#endif
 					}
 
 					scoped_lock lock(::timeoutsMutex_);
