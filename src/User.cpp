@@ -197,26 +197,26 @@ void user::configureDatabase(
 
 			// ^ Validation: OK
 
-			string id;
-			generateId(id);
+			string sessionId;
+			generateId(sessionId);
 
 			// ^ ID Generation: OK
 
 			{
 				auto resp = HttpResponse::newHttpResponse(k200OK, CT_NONE);
-				generateIdFor(resp, id);
+				generateIdFor(resp, sessionId);
 				callback(resp);
 			}
 
 			// ^ Response: OK
 
-			UserPtr user = std::move(User::create(id));
+			UserPtr user = std::move(User::create(sessionId));
 			if(postValidationCallback_)
-				postValidationCallback_(id, data, std::move(user));
+				postValidationCallback_(std::move(user), data);
 
 			// ^ Memory Cache: OK
 
-			loginWriteCallback_(id, data);
+			loginWriteCallback_(sessionId, identifier, data);
 
 			// ^ Database: OK
 		});
@@ -348,7 +348,7 @@ static void loginFilter(const HttpRequestPtr& req, std::function<void ()> positi
 
 	user = std::move(User::create(id));
 	if(postValidationCallback_)
-		postValidationCallback_(id, std::move(data), std::move(user));
+		postValidationCallback_(std::move(user), std::move(data));
 
 	if(positiveCallback)
 		positiveCallback();

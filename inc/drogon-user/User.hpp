@@ -73,8 +73,8 @@ namespace drogon::user
 	/// the objects are already in memory.
 	///
 	/// A sample callback may look like:
-	/// auto user = new User(sessionId, data.name, data.age);
-	/// drogon::user::add(user);
+	/// auto dataCtx = std::make_shared<MyData>(std::move(data));
+	/// user->setContext(dataCtx);
 	///
 	/// auto groupID = data.groupID;
 	/// auto group = BusinessLogic::getGroup(groupID);
@@ -86,8 +86,9 @@ namespace drogon::user
 	/// 	return;
 	///
 	/// group = new Group(groupID, groupData.name, user, groupData.color);
+	/// dataCtx->group = group;
 	/// BusinessLogic::addGroup(group);
-	using DatabasePostValidationCallback = std::function<void (std::string_view sessionId, const std::any& data, const UserPtr& user)>;
+	using DatabasePostValidationCallback = std::function<void (const UserPtr& user, const std::any& data)>;
 
 	/// This callback is called just before sending login info or session ID for
 	/// validation.
@@ -103,7 +104,7 @@ namespace drogon::user
 	///
 	/// A sample callback may look like:
 	/// dbWrite("sessions", id);
-	using DatabaseLoginWriteCallback = std::function<void (const std::string& id, const std::any& data)>;
+	using DatabaseLoginWriteCallback = std::function<void (std::string_view sessionId, std::string_view identifier, const std::any& data)>;
 
 	void configure(
 		std::string_view idCookieKey = "ID",
