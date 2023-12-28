@@ -16,7 +16,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-#include <uuid/uuid.h>
 
 #ifdef ENABLE_OFFLINE_CALLBACK
 #include <vector>
@@ -99,14 +98,14 @@ void user::configure(
 	IdEncoder&& idEncoder)
 {
 	idCookieKey_ = idCookieKey;
-	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : sizeof(uuid_t);
+	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
 	maxAge_ = maxAge;
 	userCacheTimeout_ = userCacheTimeout;
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : [](string& id) -> void
 		{
-			uuid_generate_random((unsigned char*)&id[0]);
+			drogon::utils::secureRandomBytes(id.data(), idUnencodedLen_);
 		}
 	);
 	idEncoder_ = std::move(
