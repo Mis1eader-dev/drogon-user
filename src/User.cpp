@@ -433,7 +433,9 @@ void drogon::user::LoggedInAPI::doFilter(const HttpRequestPtr& req, FilterCallba
 		fccb();
 	}, [fcb = std::move(fcb)]()
 	{
-		fcb(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+		auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
+		removeIdFor(resp);
+		fcb(resp);
 	});
 }
 
@@ -446,7 +448,9 @@ void drogon::user::LoggedInPage::doFilter(const HttpRequestPtr& req, FilterCallb
 			fccb();
 		}, hasLoginRedirect_ ? [fcb = std::move(fcb)]()
 		{
-			fcb(HttpResponse::newRedirectionResponse(loginPageUrl_));
+			auto resp = HttpResponse::newRedirectionResponse(loginPageUrl_);
+			removeIdFor(resp);
+			fcb(resp);
 		} : (std::function<void ()>)nullptr,
 		true
 	);
