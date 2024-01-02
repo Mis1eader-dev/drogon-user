@@ -186,7 +186,7 @@ namespace drogon::user
 		uint8_t minimumPasswordLength = 8,
 		uint8_t maximumPasswordLength = 128,
 		const std::string& loginValidationEndpoint = "/api/login",
-		const std::string& logoutValidationEndpoint = "/api/logout",
+		const std::string& logoutEndpoint = "/api/logout",
 
 		/// Set to empty to disable redirect from unauthorized pages
 		///

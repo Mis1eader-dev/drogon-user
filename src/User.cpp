@@ -130,7 +130,7 @@ void user::configureDatabase(
 	uint8_t minimumPasswordLength,
 	uint8_t maximumPasswordLength,
 	const string& loginValidationEndpoint,
-	const string& logoutValidationEndpoint,
+	const string& logoutEndpoint,
 	const string& loginPageUrl,
 	const string& loggedInPageUrl)
 {
@@ -229,7 +229,7 @@ void user::configureDatabase(
 	});
 
 	// Logout endpoint
-	app().registerHandler(logoutValidationEndpoint,
+	app().registerHandler(logoutEndpoint,
 		[
 			sessionInvalidationCallback = std::move(sessionInvalidationCallback),
 			userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
