@@ -275,7 +275,7 @@ void user::configureDatabase(
 }
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-void user::registerOfflineUserCallback(OfflineUserCallback cb)
+void user::registerOfflineUserCallback(OfflineUserCallback&& cb)
 {
 	offlineUserCallbacks_.push_back(std::move(cb));
 }
