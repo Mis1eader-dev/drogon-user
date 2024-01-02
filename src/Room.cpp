@@ -109,7 +109,7 @@ void User::forceClose()
 {
 	{
 	#ifdef ENABLE_OFFLINE_CALLBACK
-		UserPtr user = get(id);
+		UserPtr user = get(id_);
 	#endif
 
 		{

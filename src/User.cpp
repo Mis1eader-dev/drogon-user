@@ -43,7 +43,7 @@ static user::IdGenerator idGenerator_;
 static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
 static user::DatabaseLoginWriteCallback loginWriteCallback_;
-static user::IdValidator idValidator_;
+static user::IdFormatValidator idFormatValidator_;
 static user::DatabasePostValidationCallback postValidationCallback_;
 static user::ExtraContextGenerator extraContextGenerator_;
 static bool hasLoginRedirect_ = false, hasLoggedInRedirect_ = false;
@@ -120,7 +120,7 @@ void user::configureDatabase(
 	DatabaseLoginWriteCallback&& loginWriteCallback,
 	DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
 	UserLogoutNotifyCallback userLogoutNotifyCallback,
-	IdValidator idValidator,
+	IdFormatValidator idFormatValidator,
 	ExtraContextGenerator extraContextGenerator,
 	DatabasePostValidationCallback postValidationCallback,
 	const string& identifierHeaderName,
@@ -136,7 +136,7 @@ void user::configureDatabase(
 {
 	sessionValidationCallback_ = std::move(sessionValidationCallback);
 	loginWriteCallback_ = std::move(loginWriteCallback);
-	idValidator_ = idValidator;
+	idFormatValidator_ = idFormatValidator;
 	extraContextGenerator_ = extraContextGenerator;
 	postValidationCallback_ = postValidationCallback;
 	loginPageUrl_ = std::move(loginPageUrl);
@@ -370,7 +370,7 @@ static void loginFilter(const HttpRequestPtr& req, std::function<void ()>&& posi
 
 	auto id = user::getId(req);
 	if(id.size() != idLen_ ||
-		idValidator_ && !idValidator_(id))
+		idFormatValidator_ && !idFormatValidator_(id))
 	{
 		if(negativeCallback)
 			negativeCallback();

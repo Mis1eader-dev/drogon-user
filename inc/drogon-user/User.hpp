@@ -65,7 +65,7 @@ namespace drogon::user
 	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, const std::any& extraContext)>;
 
 	/// This callback is called by the Logged In filters.
-	using IdValidator = std::function<bool (std::string_view id)>;
+	using IdFormatValidator = std::function<bool (std::string_view id)>;
 
 	/// This callback is called after the user identity is validated, either through login or
 	/// session validation.
@@ -171,7 +171,7 @@ namespace drogon::user
 		/// Can be set to `nullptr` if no validation is desired.
 		///
 		/// NOTE: Even if set to `nullptr`, the length is still checked.
-		IdValidator idValidator = drogon::utils::isBase64,
+		IdFormatValidator idValidator = drogon::utils::isBase64,
 
 		/// Optional
 		ExtraContextGenerator extraContextGenerator = nullptr,
