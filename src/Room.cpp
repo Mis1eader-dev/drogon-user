@@ -105,6 +105,53 @@ void User::enqueueForPurge(string_view id)
 		)
 	);
 }
+void User::forceClose()
+{
+	{
+	#ifdef ENABLE_OFFLINE_CALLBACK
+		UserPtr user = get(id);
+	#endif
+
+		{
+			scoped_lock lock(mutex_);
+			for(const auto& [_, conns] : conns_)
+			{
+				manualClosures_ += conns.size();
+				for(const WebSocketConnectionPtr& conn : conns)
+					conn->forceClose();
+			}
+
+			{ // wait until all disconnect callbacks have finished
+				std::unique_lock lock(manualClosuresMutex_);
+				manualClosuresCv_.wait(lock, [this]() -> bool
+				{
+					return manualClosures_ == 0;
+				});
+			}
+
+			for(const auto& [room, _] : conns_)
+			{
+				scoped_lock lock(room->mutex_);
+				room->users_.erase(id_);
+			}
+
+			conns_.clear();
+		}
+
+		{
+			scoped_lock lock(::mutex_);
+			::allUsers_.erase(id_);
+		}
+
+	#ifdef ENABLE_OFFLINE_CALLBACK
+		for(const auto& cb : user::offlineUserCallbacks_)
+			cb(user);
+	#endif
+	}
+
+	scoped_lock lock(::timeoutsMutex_);
+	::timeouts_.erase(id_);
+}
 
 UserPtr User::get(string_view id)
 {
@@ -211,6 +258,12 @@ UserPtr Room::remove(const UserPtr& user)
 UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 {
 	UserPtr user = get(conn);
+	if(user->manualClosures_ > 0)
+	{
+		--(user->manualClosures_);
+		user->manualClosuresCv_.notify_all();
+		return nullptr;
+	}
 
 	auto& mtx = user->mutex_;
 	auto& connsMap = user->conns_;

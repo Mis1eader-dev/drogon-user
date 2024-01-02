@@ -1,10 +1,10 @@
 #pragma once
 
-#include "drogon-user/User.hpp"
 #include "drogon/HttpTypes.h"
 #include "drogon/WebSocketConnection.h"
 #include "drogon/WebSocketController.h"
 #include "drogon-user/Room.hpp"
+#include "drogon-user/User.hpp"
 
 struct Connect
 {
@@ -100,7 +100,10 @@ public:
 
 	virtual void handleConnectionClosed(const drogon::WebSocketConnectionPtr& conn) final override
 	{
-		Disconnect disconnect(room_.remove(conn));
+		UserPtr user = room_.remove(conn);
+		if(!user)
+			return;
+		Disconnect disconnect(std::move(user));
 		onDisconnect(std::move(disconnect));
 	}
 

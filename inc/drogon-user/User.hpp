@@ -4,6 +4,7 @@
 #include "drogon/utils/FunctionTraits.h"
 #include "drogon/utils/Utilities.h"
 #include <any>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -103,8 +104,21 @@ namespace drogon::user
 	/// This callback is called after a successful login.
 	///
 	/// A sample callback may look like:
-	/// dbWrite("sessions", id);
+	/// dbWrite("sessions", sessionId);
 	using DatabaseLoginWriteCallback = std::function<void (std::string_view sessionId, std::string_view identifier, const std::any& data)>;
+
+	/// This callback is called by a [/logout] endpoint to remove a session.
+	///
+	/// A sample callback may look like:
+	/// dbDelete("sessions", sessionId);
+	using DatabaseSessionInvalidationCallback = std::function<bool (std::string_view sessionId)>;
+
+	/// This callback is called when a logout is initiated and the user
+	/// object is alive in memory and has at least one connection.
+	///
+	/// A sample callback may look like:
+	/// Chat::notify(user, nullptr, 0); // frontend checks if empty message received, then redirect somewhere or refresh
+	using UserLogoutNotifyCallback = std::function<void (const UserPtr& user)>;
 
 	void configure(
 		std::string_view idCookieKey = "ID",
@@ -145,17 +159,26 @@ namespace drogon::user
 	);
 
 	void configureDatabase(
-		DatabaseLoginValidationCallback loginValidationCallback,
-		DatabaseSessionValidationCallback sessionValidationCallback,
-		DatabaseLoginWriteCallback loginWriteCallback,
+		DatabaseLoginValidationCallback&& loginValidationCallback,
+		DatabaseSessionValidationCallback&& sessionValidationCallback,
+		DatabaseLoginWriteCallback&& loginWriteCallback,
+
+		DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
+
+		/// Optional
+		UserLogoutNotifyCallback userLogoutNotifyCallback = nullptr,
 
 		/// Can be set to `nullptr` if no validation is desired.
 		///
 		/// NOTE: Even if set to `nullptr`, the length is still checked.
 		IdValidator idValidator = drogon::utils::isBase64,
 
+		/// Optional
 		ExtraContextGenerator extraContextGenerator = nullptr,
+
+		/// Optional
 		DatabasePostValidationCallback postValidationCallback = nullptr,
+
 		const std::string& identifierHeaderName = "email",
 		uint8_t minimumIdentifierLength = 3,
 		uint8_t maximumIdentifierLength = 254,
@@ -163,22 +186,29 @@ namespace drogon::user
 		uint8_t minimumPasswordLength = 8,
 		uint8_t maximumPasswordLength = 128,
 		const std::string& loginValidationEndpoint = "/api/login",
+		const std::string& logoutValidationEndpoint = "/api/logout",
 
 		/// Set to empty to disable redirect from unauthorized pages
-		const std::string& loginPageUrl = "/login",
+		///
+		/// Active on handlers with the filter "drogon::user::UnloggedInPage"
+		const std::string& unloggedInRedirectTo = "/login",
 
 		/// Set to empty to disable redirect from login page when already logged in
-		const std::string& loggedInPageUrl = "/admin"
+		///
+		/// Active on handlers with the filter "drogon::user::LoggedInPage"
+		const std::string& loggedInRedirectTo = "/admin"
 	);
 
 #ifdef ENABLE_OFFLINE_CALLBACK
-	void registerOfflineUserCallback(OfflineUserCallback cb);
+	void registerOfflineUserCallback(OfflineUserCallback&& cb);
 #endif
 
 	std::string generateId();
 	void generateId(std::string& id);
 	void generateIdFor(const drogon::HttpResponsePtr& resp);
 	void generateIdFor(const drogon::HttpResponsePtr& resp, const std::string& id);
+
+	void removeIdFor(const drogon::HttpResponsePtr& resp);
 
 	std::string_view getId(const drogon::HttpRequestPtr& req);
 }
@@ -199,6 +229,10 @@ private:
 	using ConnsSet = std::unordered_set<drogon::WebSocketConnectionPtr>;
 	std::unordered_map<Room*, ConnsSet> conns_;
 	mutable std::shared_mutex mutex_;
+
+	mutable std::atomic_size_t manualClosures_ = 0;
+	mutable std::condition_variable manualClosuresCv_;
+	mutable std::mutex manualClosuresMutex_;
 
 	mutable std::condition_variable initCv_;
 	mutable std::mutex initMutex_;
@@ -231,6 +265,9 @@ public:
 	static UserPtr get(const drogon::HttpRequestPtr& req);
 
 	std::string_view id() const;
+
+	/// Closes connections from all rooms
+	void forceClose();
 
 	/**
 	 * @brief Set custom data on the connection
