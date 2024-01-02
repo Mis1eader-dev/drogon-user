@@ -10,6 +10,7 @@
 #include "drogon/utils/Utilities.h"
 #include "trantor/utils/ConcurrentTaskQueue.h"
 #include <any>
+#include <cstddef>
 #include <cstdint>
 #include <json/value.h>
 #include <mutex>
@@ -104,7 +105,7 @@ void user::configure(
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : [](string& id) -> void
 		{
-			drogon::utils::secureRandomBytes(id.data(), idUnencodedLen_);
+			utils::secureRandomBytes(id.data(), idUnencodedLen_);
 		}
 	);
 	idEncoder_ = std::move(
@@ -114,6 +115,8 @@ void user::configure(
 		}
 	);
 }
+static size_t authorizationHeaderMinLen_, authorizationHeaderMaxLen_;
+static constexpr uint8_t authorizationHeaderPrefixLen = (sizeof("Basic ") / sizeof(char)) - 1;
 void user::configureDatabase(
 	DatabaseLoginValidationCallback&& loginValidationCallback,
 	DatabaseSessionValidationCallback&& sessionValidationCallback,
@@ -123,10 +126,8 @@ void user::configureDatabase(
 	IdFormatValidator idFormatValidator,
 	ExtraContextGenerator extraContextGenerator,
 	DatabasePostValidationCallback postValidationCallback,
-	const string& identifierHeaderName,
 	uint8_t minimumIdentifierLength,
 	uint8_t maximumIdentifierLength,
-	const string& passwordHeaderName,
 	uint8_t minimumPasswordLength,
 	uint8_t maximumPasswordLength,
 	const string& loginValidationEndpoint,
@@ -144,30 +145,55 @@ void user::configureDatabase(
 	hasLoginRedirect_ = !loginPageUrl_.empty();
 	hasLoggedInRedirect_ = !loggedInPageUrl_.empty();
 
+	authorizationHeaderMinLen_ = authorizationHeaderPrefixLen + utils::base64EncodedLength(minimumIdentifierLength + 1/* : */ + minimumPasswordLength);
+	authorizationHeaderMaxLen_ = authorizationHeaderPrefixLen + utils::base64EncodedLength(maximumIdentifierLength + 1/* : */ + maximumPasswordLength);
+
 	// Login endpoint
 	app().registerHandler(loginValidationEndpoint,
 		[
-			identifierHeaderName = std::move(identifierHeaderName),
 			minimumIdentifierLength,
 			maximumIdentifierLength,
-			passwordHeaderName = std::move(passwordHeaderName),
 			minimumPasswordLength,
 			maximumPasswordLength,
 			loginValidationCallback = std::move(loginValidationCallback)
 		]
 		(const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
 	{
-		const string_view identifier = req->getHeader(identifierHeaderName);
-		auto len = identifier.size();
+		const string_view authorization = req->getHeader("Authorization");
+		auto len = authorization.size();
+		if(len < authorizationHeaderMinLen_ || len > authorizationHeaderMaxLen_)
+		{
+			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+			return;
+		}
+
+		const string_view basic = authorization.substr(0, authorizationHeaderPrefixLen);
+		if(basic != "Basic " && basic != "basic ")
+		{
+			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+			return;
+		}
+
+		const string_view base64Payload = authorization.substr(authorizationHeaderPrefixLen);
+		string payload = utils::base64Decode(base64Payload);
+		auto colonIdx = payload.find(':');
+		if(colonIdx == string::npos)
+		{
+			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+			return;
+		}
+
+		const string_view
+			payloadView = payload,
+			identifier = payloadView.substr(0, colonIdx);
+		len = identifier.size();
 		if(len < minimumIdentifierLength || len > maximumIdentifierLength)
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
 		}
 
-		const string_view password =
-			string_view(req->getHeader(passwordHeaderName))
-				.substr(0, maximumPasswordLength);
+		const string_view password = payloadView.substr(colonIdx + 1);
 		len = password.size();
 		if(len < minimumPasswordLength)
 		{

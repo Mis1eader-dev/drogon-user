@@ -179,10 +179,8 @@ namespace drogon::user
 		/// Optional
 		DatabasePostValidationCallback postValidationCallback = nullptr,
 
-		const std::string& identifierHeaderName = "email",
 		uint8_t minimumIdentifierLength = 3,
 		uint8_t maximumIdentifierLength = 254,
-		const std::string& passwordHeaderName = "password",
 		uint8_t minimumPasswordLength = 8,
 		uint8_t maximumPasswordLength = 128,
 		const std::string& loginValidationEndpoint = "/api/login",
