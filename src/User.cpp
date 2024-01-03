@@ -261,23 +261,15 @@ void user::configureDatabase(
 			userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
 		](const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
 	{
-		auto id = user::getId(req);
-		if(UserPtr user = User::get(id))
-		{
-			if(userLogoutNotifyCallback)
-				userLogoutNotifyCallback(user);
-
-			user->forceClose();
-		}
-
 		taskQueue_.runTaskInQueue(
 		[
 			req = std::move(req),
 			callback = std::move(callback),
-			id = std::move(id),
-			sessionInvalidationCallback = std::move(sessionInvalidationCallback)
+			sessionInvalidationCallback = std::move(sessionInvalidationCallback),
+			userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
 		]()
 		{
+			auto id = user::getId(req);
 			if(!sessionInvalidationCallback(id))
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
@@ -293,6 +285,16 @@ void user::configureDatabase(
 			}
 
 			// ^ Response: OK
+
+			if(UserPtr user = User::get(id))
+			{
+				if(userLogoutNotifyCallback)
+					userLogoutNotifyCallback(user);
+
+				user->forceClose();
+			}
+
+			// ^ Close Connections: OK
 		});
 	},
 	{
