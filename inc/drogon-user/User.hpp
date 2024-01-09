@@ -238,7 +238,7 @@ private:
 	friend class Room;
 
 #ifdef ENABLE_GROUPS
-	std::unordered_map<size_t, GroupPtr> groups_;
+	std::unordered_map<std::string_view, GroupPtr> groups_;
 	mutable std::shared_mutex groupsMutex_;
 
 	friend class Group;
