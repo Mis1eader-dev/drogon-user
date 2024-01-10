@@ -359,31 +359,37 @@ string_view user::getId(const HttpRequestPtr& req)
 
 /* Security */
 
-namespace drogon::user
+namespace drogon::user::filter
 {
-	class LoggedInAPI : public HttpFilter<LoggedInAPI>
+	namespace api
 	{
-	public:
-		void doFilter(const HttpRequestPtr& req,
-						FilterCallback&& fcb,
-						FilterChainCallback&& fccb) override;
-	};
+		class LoggedIn : public HttpFilter<LoggedIn>
+		{
+		public:
+			void doFilter(const HttpRequestPtr& req,
+							FilterCallback&& fcb,
+							FilterChainCallback&& fccb) override;
+		};
+	}
 
-	class LoggedInPage : public HttpFilter<LoggedInPage>
+	namespace page
 	{
-	public:
-		void doFilter(const HttpRequestPtr& req,
-						FilterCallback&& fcb,
-						FilterChainCallback&& fccb) override;
-	};
+		class LoggedIn : public HttpFilter<LoggedIn>
+		{
+		public:
+			void doFilter(const HttpRequestPtr& req,
+							FilterCallback&& fcb,
+							FilterChainCallback&& fccb) override;
+		};
 
-	class UnloggedInPage : public HttpFilter<UnloggedInPage>
-	{
-	public:
-		void doFilter(const HttpRequestPtr& req,
-						FilterCallback&& fcb,
-						FilterChainCallback&& fccb) override;
-	};
+		class UnloggedIn : public HttpFilter<UnloggedIn>
+		{
+		public:
+			void doFilter(const HttpRequestPtr& req,
+							FilterCallback&& fcb,
+							FilterChainCallback&& fccb) override;
+		};
+	}
 }
 
 static void loginFilter(const HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly = false)
@@ -454,7 +460,7 @@ static void loginFilter(const HttpRequestPtr& req, std::function<void ()>&& posi
 	});
 }
 
-void drogon::user::LoggedInAPI::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
+void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
 	loginFilter(req, [fccb = std::move(fccb)]()
 	{
@@ -467,7 +473,7 @@ void drogon::user::LoggedInAPI::doFilter(const HttpRequestPtr& req, FilterCallba
 	});
 }
 
-void drogon::user::LoggedInPage::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
+void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
 	loginFilter(
 		req,
@@ -484,7 +490,7 @@ void drogon::user::LoggedInPage::doFilter(const HttpRequestPtr& req, FilterCallb
 	);
 }
 
-void drogon::user::UnloggedInPage::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
+void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
 	loginFilter(
 		req,
