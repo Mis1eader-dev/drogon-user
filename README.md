@@ -29,7 +29,7 @@ class Chat : public WebSocketRoom<Chat>
   void onDisconnect(Disconnect&& disconnect) override;
 
   WS_PATH_LIST_BEGIN
-    WS_PATH_ADD("/chat", "drogon::user::LoggedInAPI");
+    WS_PATH_ADD("/chat", "drogon::user::filter::api::LoggedIn");
   WS_PATH_LIST_END
 };
 

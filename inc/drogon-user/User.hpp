@@ -188,12 +188,12 @@ namespace drogon::user
 
 		/// Set to empty to disable redirect from unauthorized pages
 		///
-		/// Active on handlers with the filter "drogon::user::UnloggedInPage"
+		/// Active on handlers with the filter "drogon::user::filter::page::UnloggedIn"
 		const std::string& unloggedInRedirectTo = "/login",
 
 		/// Set to empty to disable redirect from login page when already logged in
 		///
-		/// Active on handlers with the filter "drogon::user::LoggedInPage"
+		/// Active on handlers with the filter "drogon::user::filter::page::LoggedIn"
 		const std::string& loggedInRedirectTo = "/admin"
 	);
 
