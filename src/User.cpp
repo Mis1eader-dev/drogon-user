@@ -392,7 +392,7 @@ namespace drogon::user::filter
 	}
 }
 
-static void loginFilter(const HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly = false)
+void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly)
 {
 	/*if(checkIndexHtmlOnly) // TODO:
 	{
@@ -462,7 +462,7 @@ static void loginFilter(const HttpRequestPtr& req, std::function<void ()>&& posi
 
 void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
-	loginFilter(req, [fccb = std::move(fccb)]()
+	loggedInFilter(req, [fccb = std::move(fccb)]()
 	{
 		fccb();
 	}, [fcb = std::move(fcb)]()
@@ -475,7 +475,7 @@ void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, Fi
 
 void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
-	loginFilter(
+	loggedInFilter(
 		req,
 		[fccb = std::move(fccb)]()
 		{
@@ -492,7 +492,7 @@ void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, F
 
 void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
-	loginFilter(
+	loggedInFilter(
 		req,
 		hasLoggedInRedirect_ ? [fcb = std::move(fcb)]()
 		{

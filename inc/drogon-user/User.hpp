@@ -209,6 +209,15 @@ namespace drogon::user
 	void removeIdFor(const drogon::HttpResponsePtr& resp);
 
 	std::string_view getId(const drogon::HttpRequestPtr& req);
+
+	/// This function can be called by a filter to customize the behavior of session validation
+	///
+	/// `positiveCallback` will be called if the session validation is successful
+	/// `negativeCallback` will be called otherwise
+	///
+	/// Only one of the two functions can be `nullptr`, in which case only one
+	/// of the callbacks will be called in either case
+	void loggedInFilter(const drogon::HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly = false);
 }
 
 class Room;
