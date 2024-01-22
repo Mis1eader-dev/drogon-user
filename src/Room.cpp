@@ -72,54 +72,92 @@ UserPtr User::create(string_view id, const WebSocketConnectionPtr& conn, Room* r
 	return std::move(user);
 }
 
+static inline trantor::TimerId enqueuePurge(string_view id)
+{
+	return drogon::app().getLoop()->runAfter(
+		user::userCacheTimeout_,
+		[id]()
+		{
+			{
+			#ifdef ENABLE_OFFLINE_CALLBACK
+				UserPtr user = get(id, false);
+			#endif
+
+				{
+					scoped_lock lock(::mutex_);
+					::allUsers_.erase(id);
+				}
+
+			#ifdef ENABLE_OFFLINE_CALLBACK
+				for(const auto& cb : user::offlineUserCallbacks_)
+					cb(user);
+			#endif
+			}
+
+			scoped_lock lock(::timeoutsMutex_);
+			::timeouts_.erase(id);
+		}
+	);
+}
+
 void User::enqueueForPurge(string_view id)
 {
 	scoped_lock lock(::timeoutsMutex_);
 	::timeouts_.insert(
 		std::make_pair(
 			id,
-			drogon::app().getLoop()->runAfter(
-				user::userCacheTimeout_,
-				[id]()
-				{
-					{
-					#ifdef ENABLE_OFFLINE_CALLBACK
-						UserPtr user = get(id);
-					#endif
-
-						{
-							scoped_lock lock(::mutex_);
-							::allUsers_.erase(id);
-						}
-
-					#ifdef ENABLE_OFFLINE_CALLBACK
-						for(const auto& cb : user::offlineUserCallbacks_)
-							cb(user);
-					#endif
-					}
-
-					scoped_lock lock(::timeoutsMutex_);
-					::timeouts_.erase(id);
-				}
-			)
+			enqueuePurge(id)
 		)
 	);
 }
+
+void User::prolongPurge(string_view id)
+{
+	decltype(::timeouts_.find(id)) find;
+	{
+		shared_lock slock(::timeoutsMutex_);
+		find = ::timeouts_.find(id);
+		if(find == ::timeouts_.end())
+			return;
+
+		drogon::app().getLoop()->invalidateTimer(find->second);
+	}
+
+	scoped_lock lock(::timeoutsMutex_);
+	find->second = enqueuePurge(id);
+}
+
 void User::forceClose()
 {
 	{
+		bool found;
+		decltype(::timeouts_.find(id_)) find;
+		{
+			shared_lock slock(::timeoutsMutex_);
+			find = ::timeouts_.find(id_);
+			if((found = (find != ::timeouts_.end())))
+				drogon::app().getLoop()->invalidateTimer(find->second);
+		}
+		if(found)
+		{
+			scoped_lock lock(::timeoutsMutex_);
+			::timeouts_.erase(find);
+		}
+	}
+
+	{
 	#ifdef ENABLE_OFFLINE_CALLBACK
-		UserPtr user = get(id_);
+		UserPtr user = get(id_, false);
 	#endif
 
 		{
 			scoped_lock lock(mutex_);
 			for(const auto& [_, conns] : conns_)
-			{
 				manualClosures_ += conns.size();
+
+			for(const auto& [_, conns] : conns_)
 				for(const WebSocketConnectionPtr& conn : conns)
 					conn->forceClose();
-			}
 
 			{ // wait until all disconnect callbacks have finished
 				std::unique_lock lock(manualClosuresMutex_);
@@ -148,20 +186,18 @@ void User::forceClose()
 			cb(user);
 	#endif
 	}
-
-	scoped_lock lock(::timeoutsMutex_);
-	::timeouts_.erase(id_);
 }
 
-UserPtr User::get(string_view id)
+UserPtr User::get(string_view id, bool extendLifespan)
 {
 	shared_lock lock(::mutex_);
 	auto find = ::allUsers_.find(id);
-	return find != ::allUsers_.end() ? find->second : nullptr;
-}
-UserPtr User::get(const HttpRequestPtr& req)
-{
-	return std::move(get(user::getId(req)));
+	if(find == ::allUsers_.end())
+		return nullptr;
+
+	if(extendLifespan)
+		User::prolongPurge(id);
+	return find->second;
 }
 
 UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
@@ -178,7 +214,7 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 		user = User::get(id);
 		if(user) // Available in memory
 		{
-			// Pointer transfer
+			// Pointer copy
 			id = user->id();
 
 			{
@@ -228,19 +264,16 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 	return std::move(user);
 }
 
-UserPtr Room::get(std::string_view id) const
+UserPtr Room::get(std::string_view id, bool extendLifespan) const
 {
 	shared_lock lock(mutex_);
 	auto find = users_.find(id);
-	return find != users_.end() ? find->second : nullptr;
-}
-UserPtr Room::get(const HttpRequestPtr& req) const
-{
-	return std::move(get(user::getId(req)));
-}
-UserPtr Room::get(const WebSocketConnectionPtr& conn) const
-{
-	return conn->getContext<User>();
+	if(find == users_.end())
+		return nullptr;
+
+	if(extendLifespan)
+		User::prolongPurge(id);
+	return find->second;
 }
 
 UserPtr Room::remove(const UserPtr& user)

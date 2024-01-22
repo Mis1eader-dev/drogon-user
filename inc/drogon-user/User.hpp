@@ -257,6 +257,9 @@ private:
 
 	static void enqueueForPurge(std::string_view id);
 
+	/// Extends the purge if it has already been enqueued for purging
+	static void prolongPurge(std::string_view id);
+
 public:
 	User(const std::string& id);
 	User(const std::string& id, const drogon::WebSocketConnectionPtr& conn, Room* room);
@@ -268,10 +271,20 @@ public:
 	/// and user's presence in memory is needed in that instant.
 	static UserPtr create(std::string_view id);
 
-	static UserPtr get(std::string_view id);
-	static UserPtr get(const drogon::HttpRequestPtr& req);
+	static UserPtr get(std::string_view id, bool extendLifespan = true);
+	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = true)
+	{
+		return std::move(get(drogon::user::getId(req)));
+	}
+	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
+	{
+		return conn->getContext<User>();
+	}
 
-	std::string_view id() const;
+	inline std::string_view id() const
+	{
+		return id_;
+	}
 
 	/// Closes connections from all rooms
 	void forceClose();

@@ -286,7 +286,7 @@ void user::configureDatabase(
 
 			// ^ Response: OK
 
-			if(UserPtr user = User::get(id))
+			if(UserPtr user = User::get(id, false))
 			{
 				if(userLogoutNotifyCallback)
 					userLogoutNotifyCallback(user);
@@ -526,11 +526,6 @@ User::User(const string& id, const WebSocketConnectionPtr& conn, Room* room) :
 		}
 	})
 {}
-
-string_view User::id() const
-{
-	return id_;
-}
 
 void User::setContext(const std::shared_ptr<void>& context)
 {
