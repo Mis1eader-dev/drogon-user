@@ -195,9 +195,10 @@ UserPtr User::get(string_view id, bool extendLifespan)
 	if(find == ::allUsers_.end())
 		return nullptr;
 
+	UserPtr user = find->second;
 	if(extendLifespan)
-		User::prolongPurge(id);
-	return find->second;
+		User::prolongPurge(user->id_);
+	return std::move(user);
 }
 
 UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
@@ -271,9 +272,10 @@ UserPtr Room::get(std::string_view id, bool extendLifespan) const
 	if(find == users_.end())
 		return nullptr;
 
+	UserPtr user = find->second;
 	if(extendLifespan)
-		User::prolongPurge(id);
-	return find->second;
+		User::prolongPurge(user->id_);
+	return std::move(user);
 }
 
 UserPtr Room::remove(const UserPtr& user)
