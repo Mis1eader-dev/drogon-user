@@ -274,7 +274,7 @@ public:
 	static UserPtr get(std::string_view id, bool extendLifespan = true);
 	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = true)
 	{
-		return std::move(get(drogon::user::getId(req)));
+		return std::move(get(drogon::user::getId(req), extendLifespan));
 	}
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
