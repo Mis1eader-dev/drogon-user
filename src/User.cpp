@@ -116,7 +116,10 @@ void user::configure(
 	);
 }
 static size_t authorizationHeaderMinLen_, authorizationHeaderMaxLen_;
-static constexpr uint8_t authorizationHeaderPrefixLen = (sizeof("Basic ") / sizeof(char)) - 1;
+static constexpr string_view
+	authorizationHeaderPrefix = "Basic ",
+	authorizationHeaderPrefix2 = "basic ";
+static constexpr uint8_t authorizationHeaderPrefixLen = authorizationHeaderPrefix.size();
 void user::configureDatabase(
 	DatabaseLoginValidationCallback&& loginValidationCallback,
 	DatabaseSessionValidationCallback&& sessionValidationCallback,
@@ -159,23 +162,24 @@ void user::configureDatabase(
 		]
 		(const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
 	{
-		const string_view authorization = req->getHeader("Authorization");
-		auto len = authorization.size();
+		string_view authorizationPayload = req->getHeader("Authorization");
+		auto len = authorizationPayload.size();
 		if(len < authorizationHeaderMinLen_ || len > authorizationHeaderMaxLen_)
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
 		}
 
-		const string_view basic = authorization.substr(0, authorizationHeaderPrefixLen);
-		if(basic != "Basic " && basic != "basic ")
+		if(!authorizationPayload.starts_with(authorizationHeaderPrefix) &&
+			!authorizationPayload.starts_with(authorizationHeaderPrefix2))
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
 		}
 
-		const string_view base64Payload = authorization.substr(authorizationHeaderPrefixLen);
-		string payload = utils::base64Decode(base64Payload);
+		authorizationPayload.remove_prefix(authorizationHeaderPrefixLen);
+
+		string payload = utils::base64Decode(authorizationPayload);
 		auto colonIdx = payload.find(':');
 		if(colonIdx == string::npos)
 		{
@@ -183,9 +187,8 @@ void user::configureDatabase(
 			return;
 		}
 
-		const string_view
-			payloadView = payload,
-			identifier = payloadView.substr(0, colonIdx);
+		authorizationPayload = payload; // view
+		string_view identifier = authorizationPayload.substr(0, colonIdx);
 		len = identifier.size();
 		if(len < minimumIdentifierLength || len > maximumIdentifierLength)
 		{
@@ -193,8 +196,8 @@ void user::configureDatabase(
 			return;
 		}
 
-		const string_view password = payloadView.substr(colonIdx + 1);
-		len = password.size();
+		authorizationPayload.remove_prefix(colonIdx + 1); // authorizationPayload = password
+		len = authorizationPayload.size();
 		if(len < minimumPasswordLength)
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
@@ -211,7 +214,7 @@ void user::configureDatabase(
 		[
 			req = std::move(req),
 			identifier,
-			password,
+			password = std::move(authorizationPayload), // authorizationPayload = password
 			extraContext = std::move(extraContext),
 			callback = std::move(callback),
 			loginValidationCallback = std::move(loginValidationCallback)
@@ -363,6 +366,8 @@ namespace drogon::user::filter
 {
 	namespace api
 	{
+		/// Extends the lifespan of the user object in memory if it exists
+		/// on every hit to this filter
 		class LoggedIn : public HttpFilter<LoggedIn>
 		{
 		public:
@@ -374,6 +379,8 @@ namespace drogon::user::filter
 
 	namespace page
 	{
+		/// Extends the lifespan of the user object in memory if it exists
+		/// on every hit to this filter
 		class LoggedIn : public HttpFilter<LoggedIn>
 		{
 		public:
@@ -382,6 +389,8 @@ namespace drogon::user::filter
 							FilterChainCallback&& fccb) override;
 		};
 
+		/// Extends the lifespan of the user object in memory if it exists
+		/// on every hit to this filter
 		class UnloggedIn : public HttpFilter<UnloggedIn>
 		{
 		public:
