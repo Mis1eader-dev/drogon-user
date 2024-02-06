@@ -7,6 +7,39 @@
 #include <string_view>
 #include <unordered_map>
 
+struct Connect
+{
+	UserPtr&& user;
+	const drogon::WebSocketConnectionPtr conn;
+
+	Connect(UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
+		user(std::move(user)),
+		conn(std::move(conn))
+	{}
+};
+
+struct Message
+{
+	std::string&& msg;
+	UserPtr&& user;
+	const drogon::WebSocketConnectionPtr conn;
+
+	Message(std::string&& msg, UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
+		msg(std::move(msg)),
+		user(std::move(user)),
+		conn(std::move(conn))
+	{}
+};
+
+struct Disconnect
+{
+	UserPtr&& user;
+
+	Disconnect(UserPtr&& user) :
+		user(std::move(user))
+	{}
+};
+
 class Room
 {
 private:
@@ -42,6 +75,8 @@ private:
 public:
 	Room();
 
+	
+
 	inline void notify(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
@@ -51,6 +86,26 @@ public:
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		conn->send(msg, len, type);
+	}
+	inline void notify(const Connect& connect, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(connect.conn, msg, type);
+	}
+	inline void notify(const Connect& connect, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(connect.conn, msg, len, type);
+	}
+	inline void notify(const Message& message, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(message.conn, msg, type);
+	}
+	inline void notify(const Message& message, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(message.conn, msg, len, type);
 	}
 
 	inline void notify(const UserPtr& user, const std::string& msg,
@@ -88,6 +143,26 @@ public:
 	}
 	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAllExcept(const Connect& connect, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(connect.conn, msg, type);
+	}
+	inline void notifyAllExcept(const Connect& connect, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(connect.conn, msg, len, type);
+	}
+	inline void notifyAllExcept(const Message& message, const std::string& msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(message.conn, msg, type);
+	}
+	inline void notifyAllExcept(const Message& message, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(message.conn, msg, len, type);
+	}
 
 protected:
 	std::unordered_map<std::string_view, UserPtr> users_;
