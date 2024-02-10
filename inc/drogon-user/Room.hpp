@@ -4,6 +4,7 @@
 #include "drogon/HttpRequest.h"
 #include "drogon/WebSocketConnection.h"
 #include <shared_mutex>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -77,7 +78,7 @@ public:
 
 	
 
-	inline void notify(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
+	inline void notify(const drogon::WebSocketConnectionPtr& conn, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		conn->send(msg, type);
@@ -87,7 +88,7 @@ public:
 	{
 		conn->send(msg, len, type);
 	}
-	inline void notify(const Connect& connect, const std::string& msg,
+	inline void notify(const Connect& connect, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(connect.conn, msg, type);
@@ -97,7 +98,7 @@ public:
 	{
 		notify(connect.conn, msg, len, type);
 	}
-	inline void notify(const Message& message, const std::string& msg,
+	inline void notify(const Message& message, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(message.conn, msg, type);
@@ -108,7 +109,7 @@ public:
 		notify(message.conn, msg, len, type);
 	}
 
-	inline void notify(const UserPtr& user, const std::string& msg,
+	inline void notify(const UserPtr& user, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(user, msg.data(), msg.size(), type);
@@ -118,7 +119,7 @@ public:
 
 
 
-	inline void notifyAll(const std::string& msg,
+	inline void notifyAll(std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAll(msg.data(), msg.size(), type);
@@ -128,7 +129,7 @@ public:
 
 
 
-	inline void notifyAllExcept(const UserPtr& user, const std::string& msg,
+	inline void notifyAllExcept(const UserPtr& user, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(user, msg.data(), msg.size(), type);
@@ -136,14 +137,14 @@ public:
 	void notifyAllExcept(const UserPtr& user, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 
-	inline void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const std::string& msg,
+	inline void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(conn, msg.data(), msg.size(), type);
 	}
 	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
-	inline void notifyAllExcept(const Connect& connect, const std::string& msg,
+	inline void notifyAllExcept(const Connect& connect, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(connect.conn, msg, type);
@@ -153,7 +154,7 @@ public:
 	{
 		notifyAllExcept(connect.conn, msg, len, type);
 	}
-	inline void notifyAllExcept(const Message& message, const std::string& msg,
+	inline void notifyAllExcept(const Message& message, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(message.conn, msg, type);
