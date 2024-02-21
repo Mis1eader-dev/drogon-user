@@ -36,10 +36,13 @@ namespace drogon::user
 #endif
 }
 
-static string idCookieKey_;
+static string idCookieKey_ = "ID";
 static uint8_t idUnencodedLen_, idLen_;
-static int maxAge_;
+static int maxAge_ = 86400;
 static Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
+static bool
+	httpOnly_ = true,
+	secure_ = true;
 static user::IdGenerator idGenerator_;
 static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
@@ -56,6 +59,8 @@ void user::configure(
 	string_view idCookieKey,
 	int idCookieMaxAge,
 	Cookie::SameSite sameSite,
+	bool httpOnly,
+	bool secure,
 	double userCacheTimeout,
 	uint8_t idUnencodedLen,
 	uint8_t idEncodedLen,
@@ -67,6 +72,8 @@ void user::configure(
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
 	maxAge_ = idCookieMaxAge;
 	sameSite_ = sameSite;
+	httpOnly_ = httpOnly;
+	secure_ = secure;
 	userCacheTimeout_ = userCacheTimeout;
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : [](string& id) -> void
@@ -305,7 +312,8 @@ void user::generateIdFor(const HttpResponsePtr& resp, const string& id)
 	cookie.setPath("/");
 	cookie.setMaxAge(maxAge_);
 	cookie.setSameSite(sameSite_);
-	cookie.setHttpOnly(true);
+	cookie.setHttpOnly(httpOnly_);
+	cookie.setSecure(secure_);
 	resp->addCookie(std::move(cookie));
 }
 
@@ -315,7 +323,8 @@ void user::removeIdFor(const HttpResponsePtr& resp)
 	cookie.setPath("/");
 	cookie.setMaxAge(0);
 	cookie.setSameSite(sameSite_);
-	cookie.setHttpOnly(true);
+	cookie.setHttpOnly(httpOnly_);
+	cookie.setSecure(secure_);
 	resp->addCookie(std::move(cookie));
 }
 

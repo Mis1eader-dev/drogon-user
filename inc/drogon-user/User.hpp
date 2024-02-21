@@ -125,6 +125,8 @@ namespace drogon::user
 		std::string_view idCookieKey,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
+		bool httpOnly,
+		bool secure,
 		double userCacheTimeout,
 		uint8_t idCookieUnencodedLen,
 		uint8_t idCookieEncodedLen,
@@ -135,41 +137,49 @@ namespace drogon::user
 		std::string_view idCookieKey = "ID",
 		int idCookieMaxAge = 86400,
 		drogon::Cookie::SameSite sameSite = drogon::Cookie::SameSite::kStrict,
+		bool httpOnly = true,
+		bool secure = true,
 		double userCacheTimeout = 20.0)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, userCacheTimeout, 0, 0, nullptr, nullptr);
+		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
+		bool httpOnly,
+		bool secure,
 		double userCacheTimeout,
 		uint8_t idCookieUnencodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
+		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
+		bool httpOnly,
+		bool secure,
 		double userCacheTimeout,
 		uint8_t idCookieUnencodedLen,
 		uint8_t idCookieEncodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
+		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
+		bool httpOnly,
+		bool secure,
 		double userCacheTimeout,
 		uint8_t idCookieUnencodedLen,
 		IdGenerator&& idGenerator,
 		IdEncoder&& idEncoder)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
+		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
 	}
 
 	void configureDatabase(
