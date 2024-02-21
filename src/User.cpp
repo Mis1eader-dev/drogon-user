@@ -39,7 +39,7 @@ namespace drogon::user
 static string idCookieKey_;
 static uint8_t idUnencodedLen_, idLen_;
 static int maxAge_;
-static constexpr Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
+static Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
 static user::IdGenerator idGenerator_;
 static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
@@ -54,43 +54,8 @@ static trantor::ConcurrentTaskQueue taskQueue_(std::thread::hardware_concurrency
 
 void user::configure(
 	string_view idCookieKey,
-	int maxAge,
-	double userCacheTimeout)
-{
-	configure(idCookieKey, maxAge, userCacheTimeout, 0, 0, nullptr, nullptr);
-}
-void user::configure(
-	string_view idCookieKey,
-	int maxAge,
-	double userCacheTimeout,
-	uint8_t idUnencodedLen,
-	IdGenerator&& idGenerator)
-{
-	configure(idCookieKey, maxAge, userCacheTimeout, idUnencodedLen, 0, std::move(idGenerator), nullptr);
-}
-void user::configure(
-	string_view idCookieKey,
-	int maxAge,
-	double userCacheTimeout,
-	uint8_t idUnencodedLen,
-	uint8_t idEncodedLen,
-	IdGenerator&& idGenerator)
-{
-	configure(idCookieKey, maxAge, userCacheTimeout, idUnencodedLen, idEncodedLen, std::move(idGenerator), nullptr);
-}
-void user::configure(
-	string_view idCookieKey,
-	int maxAge,
-	double userCacheTimeout,
-	uint8_t idUnencodedLen,
-	IdGenerator&& idGenerator,
-	IdEncoder&& idEncoder)
-{
-	configure(idCookieKey, maxAge, userCacheTimeout, idUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
-}
-void user::configure(
-	string_view idCookieKey,
-	int maxAge,
+	int idCookieMaxAge,
+	Cookie::SameSite sameSite,
 	double userCacheTimeout,
 	uint8_t idUnencodedLen,
 	uint8_t idEncodedLen,
@@ -100,7 +65,8 @@ void user::configure(
 	idCookieKey_ = idCookieKey;
 	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
-	maxAge_ = maxAge;
+	maxAge_ = idCookieMaxAge;
+	sameSite_ = sameSite;
 	userCacheTimeout_ = userCacheTimeout;
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : [](string& id) -> void
