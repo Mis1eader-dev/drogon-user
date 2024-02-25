@@ -17,22 +17,6 @@ set(DROGON_USER_LIBS
 
 # Options
 
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-set(BUILD_CTL OFF)
-set(BUILD_EXAMPLES OFF)
-set(BUILD_ORM OFF)
-set(COZ_PROFILING OFF)
-set(BUILD_DOC OFF)
-set(BUILD_POSTGRESQL OFF)
-set(BUILD_MYSQL OFF)
-set(BUILD_SQLITE OFF)
-set(BUILD_REDIS OFF)
-set(BUILD_BROTLI ON)
-set(BUILD_YAML_CONFIG OFF)
-set(USE_SUBMODULE ON)
-set(BUILD_SHARED_LIBS OFF)
-set(CMAKE_BUILD_TYPE Release)
-
 option(ENABLE_OFFLINE_CALLBACK "Adds offline user callback. NOTE: If enabled, it must be set before `drogon::app()::run()`, by calling `drogon::user::setOfflineUserCallback(...)`, otherwise it throws" OFF)
 option(ENABLE_IDENTIFIER_MAP "Adds identifier map lookup capability within rooms" OFF)
 
