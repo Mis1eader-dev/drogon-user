@@ -46,10 +46,10 @@ class Room
 private:
 	UserPtr add(const drogon::HttpRequestPtr& req, const drogon::WebSocketConnectionPtr& conn);
 
-	UserPtr get(std::string_view id, bool extendLifespan = true) const;
-	inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = true) const
+	UserPtr get(std::string_view id, bool extendLifespan = false) const;
+	inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false) const
 	{
-		return std::move(get(drogon::user::getId(req)));
+		return std::move(get(drogon::user::getId(req), extendLifespan));
 	}
 	inline UserPtr get(const drogon::WebSocketConnectionPtr& conn) const
 	{

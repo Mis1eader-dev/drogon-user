@@ -80,7 +80,7 @@ static inline trantor::TimerId enqueuePurge(string_view id)
 		{
 			{
 			#ifdef ENABLE_OFFLINE_CALLBACK
-				UserPtr user = User::get(id, false);
+				UserPtr user = User::get(id);
 			#endif
 
 				{

@@ -262,7 +262,7 @@ void user::configureDatabase(
 
 			// ^ Response: OK
 
-			if(UserPtr user = User::get(id, false))
+			if(UserPtr user = User::get(id))
 			{
 				if(userLogoutNotifyCallback)
 					userLogoutNotifyCallback(user);
@@ -397,7 +397,7 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 		return;
 	}
 
-	if(User::get(id)) // Is in a room and logged in
+	if(User::get(id, true)) // Is in a room and logged in
 	{
 		if(positiveCallback)
 			positiveCallback();

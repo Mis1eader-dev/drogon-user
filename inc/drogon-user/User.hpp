@@ -295,8 +295,8 @@ public:
 	/// and user's presence in memory is needed in that instant.
 	static UserPtr create(std::string_view id);
 
-	static UserPtr get(std::string_view id, bool extendLifespan = true);
-	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = true)
+	static UserPtr get(std::string_view id, bool extendLifespan = false);
+	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false)
 	{
 		return std::move(get(drogon::user::getId(req), extendLifespan));
 	}
