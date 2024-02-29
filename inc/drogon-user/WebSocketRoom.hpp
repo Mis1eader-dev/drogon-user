@@ -3,10 +3,10 @@
 #include "drogon/HttpTypes.h"
 #include "drogon/WebSocketConnection.h"
 #include "drogon/WebSocketController.h"
-// #include "drogon-user/Room.hpp"
-#include "Room.hpp"
-//#include "drogon-user/User.hpp"
-#include "User.hpp"
+#include "drogon-user/Room.hpp"
+// #include "Room.hpp"
+#include "drogon-user/User.hpp"
+// #include "User.hpp"
 
 template<
 	class Self,
