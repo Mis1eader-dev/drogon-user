@@ -3,6 +3,7 @@
 #include "drogon-user/User.hpp"
 #include "drogon/HttpRequest.h"
 #include "drogon/WebSocketConnection.h"
+#include <json/value.h>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -78,91 +79,166 @@ public:
 
 	
 
-	inline void notify(const drogon::WebSocketConnectionPtr& conn, std::string_view msg,
-		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
-	{
-		conn->send(msg, type);
-	}
 	inline void notify(const drogon::WebSocketConnectionPtr& conn, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		conn->send(msg, len, type);
 	}
-	inline void notify(const Connect& connect, std::string_view msg,
+	inline void notify(const drogon::WebSocketConnectionPtr& conn, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
-		notify(connect.conn, msg, type);
+		conn->send(msg, type);
+	}
+	void notify(const drogon::WebSocketConnectionPtr& conn, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text); // TODO: Once drogon has JSON for WS, this func can be inlined
+	inline void notify(const drogon::WebSocketConnectionPtr& conn, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(conn, *(Json::Value*)json, type);
 	}
 	inline void notify(const Connect& connect, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(connect.conn, msg, len, type);
 	}
-	inline void notify(const Message& message, std::string_view msg,
+	inline void notify(const Connect& connect, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
-		notify(message.conn, msg, type);
+		notify(connect.conn, msg, type);
+	}
+	inline void notify(const Connect& connect, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(connect.conn, json, type);
+	}
+	inline void notify(const Connect& connect, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(connect.conn, json, type);
 	}
 	inline void notify(const Message& message, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(message.conn, msg, len, type);
 	}
+	inline void notify(const Message& message, std::string_view msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(message.conn, msg, type);
+	}
+	inline void notify(const Message& message, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(message.conn, json, type);
+	}
+	inline void notify(const Message& message, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(message.conn, json, type);
+	}
 
+	void notify(const UserPtr& user, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 	inline void notify(const UserPtr& user, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notify(user, msg.data(), msg.size(), type);
 	}
-	void notify(const UserPtr& user, const char* msg,
-		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	void notify(const UserPtr& user, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notify(const UserPtr& user, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notify(user, *(Json::Value*)json, type);
+	}
 
 
 
+	void notifyAll(const char* msg, uint64_t len,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 	inline void notifyAll(std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAll(msg.data(), msg.size(), type);
 	}
-	void notifyAll(const char* msg, uint64_t len,
+	void notifyAll(Json::Value& json,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAll(const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAll(*(Json::Value*)json, type);
+	}
 
 
 
+	void notifyAllExcept(const UserPtr& user, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 	inline void notifyAllExcept(const UserPtr& user, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(user, msg.data(), msg.size(), type);
 	}
-	void notifyAllExcept(const UserPtr& user, const char* msg,
-		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	void notifyAllExcept(const UserPtr& user, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAllExcept(const UserPtr& user, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(user, *(Json::Value*)json, type);
+	}
 
+	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
+		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
 	inline void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(conn, msg.data(), msg.size(), type);
 	}
-	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const char* msg,
-		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
-	inline void notifyAllExcept(const Connect& connect, std::string_view msg,
+	void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text);
+	inline void notifyAllExcept(const drogon::WebSocketConnectionPtr& conn, const Json::Value* json,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
-		notifyAllExcept(connect.conn, msg, type);
+		notifyAllExcept(conn, *(Json::Value*)json, type);
 	}
 	inline void notifyAllExcept(const Connect& connect, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(connect.conn, msg, len, type);
 	}
-	inline void notifyAllExcept(const Message& message, std::string_view msg,
+	inline void notifyAllExcept(const Connect& connect, std::string_view msg,
 		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
-		notifyAllExcept(message.conn, msg, type);
+		notifyAllExcept(connect.conn, msg, type);
+	}
+	inline void notifyAllExcept(const Connect& connect, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(connect.conn, json, type);
+	}
+	inline void notifyAllExcept(const Connect& connect, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(connect.conn, json, type);
 	}
 	inline void notifyAllExcept(const Message& message, const char* msg,
 		uint64_t len, const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
 	{
 		notifyAllExcept(message.conn, msg, len, type);
+	}
+	inline void notifyAllExcept(const Message& message, std::string_view msg,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(message.conn, msg, type);
+	}
+	inline void notifyAllExcept(const Message& message, Json::Value& json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(message.conn, json, type);
+	}
+	inline void notifyAllExcept(const Message& message, const Json::Value* json,
+		const drogon::WebSocketMessageType type = drogon::WebSocketMessageType::Text)
+	{
+		notifyAllExcept(message.conn, json, type);
 	}
 
 protected:

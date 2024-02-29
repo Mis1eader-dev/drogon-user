@@ -3,6 +3,8 @@
 #include "drogon/HttpAppFramework.h"
 #include "drogon/WebSocketConnection.h"
 #include "trantor/net/EventLoop.h"
+#include <json/value.h>
+#include <json/writer.h>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -318,6 +320,15 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 	return std::move(user);
 }
 
+void Room::notify(const drogon::WebSocketConnectionPtr& conn, Json::Value& json,
+	const WebSocketMessageType type)
+{
+	Json::FastWriter writer;
+	writer.omitEndingLineFeed();
+	auto msg = writer.write(json);
+	notify(conn, msg.data(), msg.size(), type);
+}
+
 void Room::notify(const UserPtr& user, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
@@ -330,6 +341,14 @@ void Room::notify(const UserPtr& user, const char* msg,
 	for(const WebSocketConnectionPtr& conn : find->second)
 		notify(conn, msg, len, type);
 }
+void Room::notify(const UserPtr& user, Json::Value& json,
+	const WebSocketMessageType type)
+{
+	Json::FastWriter writer;
+	writer.omitEndingLineFeed();
+	auto msg = writer.write(json);
+	notify(user, msg.data(), msg.size(), type);
+}
 
 void Room::notifyAll(const char* msg, uint64_t len,
 	const WebSocketMessageType type)
@@ -337,6 +356,14 @@ void Room::notifyAll(const char* msg, uint64_t len,
 	shared_lock lock(mutex_);
 	for(const auto& [_, user] : users_)
 		notify(user, msg, len, type);
+}
+void Room::notifyAll(Json::Value& json,
+	const WebSocketMessageType type)
+{
+	Json::FastWriter writer;
+	writer.omitEndingLineFeed();
+	auto msg = writer.write(json);
+	notifyAll(msg.data(), msg.size(), type);
 }
 
 void Room::notifyAllExcept(const UserPtr& user, const char* msg,
@@ -357,6 +384,14 @@ void Room::notifyAllExcept(const UserPtr& user, const char* msg,
 	}
 	for(; it != end; ++it)
 		notify(it->second, msg, len, type);
+}
+void Room::notifyAllExcept(const UserPtr& user, Json::Value& json,
+	const WebSocketMessageType type)
+{
+	Json::FastWriter writer;
+	writer.omitEndingLineFeed();
+	auto msg = writer.write(json);
+	notifyAllExcept(user, msg.data(), msg.size(), type);
 }
 
 void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const char* msg,
@@ -386,4 +421,12 @@ void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const char* msg,
 	}
 	for(; it != end; ++it)
 		notify(*it, msg, len, type);
+}
+void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, Json::Value& json,
+	const WebSocketMessageType type)
+{
+	Json::FastWriter writer;
+	writer.omitEndingLineFeed();
+	auto msg = writer.write(json);
+	notifyAllExcept(conn, msg.data(), msg.size(), type);
 }
