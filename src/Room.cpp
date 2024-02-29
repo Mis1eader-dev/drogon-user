@@ -320,7 +320,7 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 	return std::move(user);
 }
 
-void Room::notify(const drogon::WebSocketConnectionPtr& conn, Json::Value& json,
+void Room::notify(const WebSocketConnectionPtr& conn, Json::Value& json,
 	const WebSocketMessageType type)
 {
 	Json::FastWriter writer;
