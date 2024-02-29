@@ -113,41 +113,30 @@ void User::enqueueForPurge(string_view id)
 
 void User::prolongPurge(string_view id)
 {
-	decltype(::timeouts_.find(id)) find;
-	{
-		shared_lock slock(::timeoutsMutex_);
-		find = ::timeouts_.find(id);
-		if(find == ::timeouts_.end())
-			return;
-
-		drogon::app().getLoop()->invalidateTimer(find->second);
-	}
-
 	scoped_lock lock(::timeoutsMutex_);
+	auto find = ::timeouts_.find(id);
+	if(find == ::timeouts_.end())
+		return;
+
+	drogon::app().getLoop()->invalidateTimer(find->second);
 	find->second = enqueuePurge(id);
 }
 
 void User::forceClose()
 {
 	{
-		bool found;
-		decltype(::timeouts_.find(id_)) find;
+		scoped_lock lock(::timeoutsMutex_);
+		auto find = ::timeouts_.find(id_);
+		if(find != ::timeouts_.end())
 		{
-			shared_lock slock(::timeoutsMutex_);
-			find = ::timeouts_.find(id_);
-			if((found = (find != ::timeouts_.end())))
-				drogon::app().getLoop()->invalidateTimer(find->second);
-		}
-		if(found)
-		{
-			scoped_lock lock(::timeoutsMutex_);
+			drogon::app().getLoop()->invalidateTimer(find->second);
 			::timeouts_.erase(find);
 		}
 	}
 
 	{
 	#ifdef ENABLE_OFFLINE_CALLBACK
-		UserPtr user = get(id_, false);
+		UserPtr user = get(id_);
 	#endif
 
 		{
@@ -225,15 +214,13 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 				mtx.unlock_shared();
 				if(isOrphan)
 				{
-					decltype(::timeouts_.find(id)) find;
-					{
-						shared_lock slock(::timeoutsMutex_);
-						find = ::timeouts_.find(id);
-					}
-					drogon::app().getLoop()->invalidateTimer(find->second);
-
 					scoped_lock lock(::timeoutsMutex_);
-					::timeouts_.erase(find);
+					auto find = ::timeouts_.find(id);
+					if(find != ::timeouts_.end())
+					{
+						drogon::app().getLoop()->invalidateTimer(find->second);
+						::timeouts_.erase(find);
+					}
 				}
 			}
 
@@ -267,12 +254,15 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 
 UserPtr Room::get(std::string_view id, bool extendLifespan) const
 {
-	shared_lock lock(mutex_);
-	auto find = users_.find(id);
-	if(find == users_.end())
-		return nullptr;
+	UserPtr user = nullptr;
+	{
+		shared_lock lock(mutex_);
+		auto find = users_.find(id);
+		if(find == users_.end())
+			return std::move(user);
 
-	UserPtr user = find->second;
+		user = find->second;
+	}
 	if(extendLifespan)
 		User::prolongPurge(user->id_);
 	return std::move(user);
@@ -303,42 +293,33 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 	auto& mtx = user->mutex_;
 	auto& connsMap = user->conns_;
 
-	shared_lock slock(mtx);
-	auto find = connsMap.find(this);
-	if(find == connsMap.end())
-		return std::move(user);
-
-	auto& connsSet = find->second;
-	if(connsSet.size() == 1) // Final connection to room
+	string_view id;
 	{
-		string_view id = user->id();
-		if(connsMap.size() == 1) // Final connection to server
-		{
-			slock.unlock();
-			{
-				scoped_lock lock(mtx);
-				connsMap.clear();
-			}
+		scoped_lock lock(mtx);
+		auto find = connsMap.find(this);
+		if(find == connsMap.end())
+			return std::move(user);
 
-			User::enqueueForPurge(id);
+		auto& connsSet = find->second;
+		if(connsSet.size() == 1) // Final connection to room
+		{
+			id = user->id();
+			if(connsMap.size() == 1) // Final connection to server
+			{
+				connsMap.clear();
+				User::enqueueForPurge(id);
+			}
+			else
+				connsMap.erase(this);
 		}
 		else
-		{
-			slock.unlock();
+			connsSet.erase(conn);
+	}
 
-			scoped_lock lock(mtx);
-			connsMap.erase(this);
-		}
-
+	if(!id.empty())
+	{
 		scoped_lock lock(mutex_);
 		users_.erase(id);
-	}
-	else
-	{
-		slock.unlock();
-
-		scoped_lock lock(mtx);
-		connsSet.erase(conn);
 	}
 
 	return std::move(user);
