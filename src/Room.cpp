@@ -208,19 +208,12 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 			id = user->id();
 
 			{
-				auto& mtx = user->mutex_;
-				mtx.lock_shared();
-				bool isOrphan = user->conns_.empty();
-				mtx.unlock_shared();
-				if(isOrphan)
+				scoped_lock lock(::timeoutsMutex_);
+				auto find = ::timeouts_.find(id);
+				if(find != ::timeouts_.end())
 				{
-					scoped_lock lock(::timeoutsMutex_);
-					auto find = ::timeouts_.find(id);
-					if(find != ::timeouts_.end())
-					{
-						drogon::app().getLoop()->invalidateTimer(find->second);
-						::timeouts_.erase(find);
-					}
+					drogon::app().getLoop()->invalidateTimer(find->second);
+					::timeouts_.erase(find);
 				}
 			}
 
