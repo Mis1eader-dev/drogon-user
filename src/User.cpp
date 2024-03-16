@@ -350,6 +350,16 @@ namespace drogon::user::filter
 							FilterCallback&& fcb,
 							FilterChainCallback&& fccb) override;
 		};
+
+		/// Extends the lifespan of the user object in memory if it exists
+		/// on every hit to this filter
+		class UnloggedIn : public HttpFilter<UnloggedIn>
+		{
+		public:
+			void doFilter(const HttpRequestPtr& req,
+							FilterCallback&& fcb,
+							FilterChainCallback&& fccb) override;
+		};
 	}
 
 	namespace page
@@ -446,15 +456,34 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 
 void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
 {
-	loggedInFilter(req, [fccb = std::move(fccb)]()
-	{
-		fccb();
-	}, [fcb = std::move(fcb)]()
-	{
-		auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
-		removeIdFor(resp);
-		fcb(resp);
-	});
+	loggedInFilter(
+		req,
+		[fccb = std::move(fccb)]()
+		{
+			fccb();
+		},
+		[fcb = std::move(fcb)]()
+		{
+			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
+			removeIdFor(resp);
+			fcb(resp);
+		}
+	);
+}
+
+void drogon::user::filter::api::UnloggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
+{
+	loggedInFilter(
+		req,
+		[fcb = std::move(fcb)]()
+		{
+			fcb(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+		},
+		[fccb = std::move(fccb)]()
+		{
+			fccb();
+		}
+	);
 }
 
 void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, FilterCallback&& fcb, FilterChainCallback&& fccb)
