@@ -88,7 +88,7 @@ void user::configure(
 		}
 	);
 }
-static size_t authorizationHeaderMinLen_, authorizationHeaderMaxLen_;
+static size_t authorizationHeaderMinLen_;
 static constexpr string_view
 	authorizationHeaderPrefix = "Basic ",
 	authorizationHeaderPrefix2 = "basic ";
@@ -121,8 +121,11 @@ void user::configureDatabase(
 	hasLoginRedirect_ = !loginPageUrl_.empty();
 	hasLoggedInRedirect_ = !loggedInPageUrl_.empty();
 
-	authorizationHeaderMinLen_ = authorizationHeaderPrefixLen + utils::base64EncodedLength(minimumIdentifierLength + 1/* : */ + minimumPasswordLength);
-	authorizationHeaderMaxLen_ = authorizationHeaderPrefixLen + utils::base64EncodedLength(maximumIdentifierLength + 1/* : */ + maximumPasswordLength);
+	authorizationHeaderMinLen_ =
+		authorizationHeaderPrefixLen +
+		utils::base64EncodedLength(
+			minimumIdentifierLength + 1/* : */ + minimumPasswordLength
+		);
 
 	// Login endpoint
 	app().registerHandler(loginValidationEndpoint,
@@ -137,7 +140,7 @@ void user::configureDatabase(
 	{
 		string_view authorizationPayload = req->getHeader("Authorization");
 		auto len = authorizationPayload.size();
-		if(len < authorizationHeaderMinLen_ || len > authorizationHeaderMaxLen_)
+		if(len < authorizationHeaderMinLen_)
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
@@ -160,14 +163,15 @@ void user::configureDatabase(
 			return;
 		}
 
-		authorizationPayload = payload; // view
-		string_view identifier = authorizationPayload.substr(0, colonIdx);
-		len = identifier.size();
-		if(len < minimumIdentifierLength || len > maximumIdentifierLength)
+		// colonIdx = identifierLen
+		if(colonIdx < minimumIdentifierLength || colonIdx > maximumIdentifierLength)
 		{
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
 		}
+
+		authorizationPayload = payload; // view
+		string_view identifier = authorizationPayload.substr(0, colonIdx);
 
 		authorizationPayload.remove_prefix(colonIdx + 1); // authorizationPayload = password
 		len = authorizationPayload.size();
@@ -176,6 +180,9 @@ void user::configureDatabase(
 			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 			return;
 		}
+
+		if(len > maximumPasswordLength) // truncate the password if it exceeds the limit
+			authorizationPayload.remove_suffix(len - maximumPasswordLength);
 
 		// ^ Length: OK
 
