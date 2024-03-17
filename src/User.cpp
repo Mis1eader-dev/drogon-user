@@ -209,8 +209,7 @@ void user::configureDatabase(
 
 			// ^ Validation: OK
 
-			string sessionId;
-			generateId(sessionId);
+			string sessionId = generateId();
 
 			// ^ ID Generation: OK
 
@@ -295,22 +294,11 @@ void user::registerOfflineUserCallback(OfflineUserCallback&& cb)
 string user::generateId()
 {
 	string id;
-	generateId(id);
-	return id;
-}
-void user::generateId(string& id)
-{
 	id.reserve(idLen_);
 	id.resize(idUnencodedLen_);
 	idGenerator_(id);
 	idEncoder_(id);
-}
-
-void user::generateIdFor(const HttpResponsePtr& resp)
-{
-	string id;
-	generateId(id);
-	generateIdFor(resp, std::move(id));
+	return id;
 }
 
 void user::generateIdFor(const HttpResponsePtr& resp, const string& id)
@@ -335,7 +323,7 @@ void user::removeIdFor(const HttpResponsePtr& resp)
 	resp->addCookie(std::move(cookie));
 }
 
-string_view user::getId(const HttpRequestPtr& req)
+const string& user::getIdRef(const HttpRequestPtr& req)
 {
 	return req->getCookie(idCookieKey_);
 }

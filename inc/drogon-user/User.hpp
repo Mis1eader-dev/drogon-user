@@ -226,13 +226,28 @@ namespace drogon::user
 #endif
 
 	std::string generateId();
-	void generateId(std::string& id);
-	void generateIdFor(const drogon::HttpResponsePtr& resp);
 	void generateIdFor(const drogon::HttpResponsePtr& resp, const std::string& id);
+	inline void generateIdFor(const drogon::HttpResponsePtr& resp)
+	{
+		generateIdFor(resp, std::move(generateId()));
+	}
 
 	void removeIdFor(const drogon::HttpResponsePtr& resp);
 
-	std::string_view getId(const drogon::HttpRequestPtr& req);
+	const std::string& getIdRef(const drogon::HttpRequestPtr& req);
+	inline std::string_view getId(const drogon::HttpRequestPtr& req)
+	{
+		return getIdRef(req);
+	}
+
+	inline void prolongIdFor(const drogon::HttpResponsePtr& resp, const std::string& id)
+	{
+		generateIdFor(resp, id);
+	}
+	inline void prolongIdFor(const drogon::HttpRequestPtr& req, const drogon::HttpResponsePtr& resp)
+	{
+		prolongIdFor(resp, getIdRef(req));
+	}
 
 	/// This function can be called by a filter to customize the behavior of session validation
 	///
