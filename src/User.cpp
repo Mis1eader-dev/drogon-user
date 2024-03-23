@@ -38,6 +38,7 @@ namespace drogon::user
 
 static string idCookieKey_ = "ID";
 static uint8_t idUnencodedLen_, idLen_;
+static uint16_t forkedIdLen_;
 static int maxAge_ = 86400;
 static Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
 static bool
@@ -46,6 +47,7 @@ static bool
 static user::IdGenerator idGenerator_;
 static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
+static user::MemorySessionVerificationCallback sessionVerificationCallback_;
 static user::DatabaseLoginWriteCallback loginWriteCallback_;
 static user::IdFormatValidator idFormatValidator_;
 static user::DatabasePostValidationCallback postValidationCallback_;
@@ -70,6 +72,7 @@ void user::configure(
 	idCookieKey_ = idCookieKey;
 	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
+	forkedIdLen_ = idLen_ * 2;
 	maxAge_ = idCookieMaxAge;
 	sameSite_ = sameSite;
 	httpOnly_ = httpOnly;
@@ -98,6 +101,7 @@ void user::configureDatabase(
 	DatabaseSessionValidationCallback&& sessionValidationCallback,
 	DatabaseLoginWriteCallback&& loginWriteCallback,
 	DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
+	MemorySessionVerificationCallback sessionVerificationCallback,
 	UserLogoutNotifyCallback userLogoutNotifyCallback,
 	IdFormatValidator idFormatValidator,
 	ExtraContextGenerator extraContextGenerator,
@@ -112,6 +116,7 @@ void user::configureDatabase(
 	const string& loggedInPageUrl)
 {
 	sessionValidationCallback_ = std::move(sessionValidationCallback);
+	sessionVerificationCallback_ = std::move(sessionVerificationCallback);
 	loginWriteCallback_ = std::move(loginWriteCallback);
 	idFormatValidator_ = idFormatValidator;
 	extraContextGenerator_ = extraContextGenerator;
@@ -221,13 +226,17 @@ void user::configureDatabase(
 
 			// ^ Response: OK
 
-			UserPtr user = std::move(User::create(sessionId));
+			UserPtr user = std::move(
+				User::create(
+					std::move(sessionId)
+				)
+			);
 			if(postValidationCallback_)
-				postValidationCallback_(std::move(user), data);
+				postValidationCallback_(user, data);
 
 			// ^ Memory Cache: OK
 
-			loginWriteCallback_(sessionId, identifier, data);
+			loginWriteCallback_(user->id(), identifier, data);
 
 			// ^ Database: OK
 		});
@@ -381,7 +390,11 @@ namespace drogon::user::filter
 	}
 }
 
-void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly)
+void drogon::user::loggedInFilter(
+	const HttpRequestPtr& req,
+	std::function<void (string&& overriddenId)>&& positiveCallback,
+	std::function<void ()>&& negativeCallback,
+	bool checkIndexHtmlOnly)
 {
 	/*if(checkIndexHtmlOnly) // TODO:
 	{
@@ -391,21 +404,63 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 		return;
 	}*/
 
-	auto id = user::getId(req);
-	if(id.size() != idLen_ ||
-		idFormatValidator_ && !idFormatValidator_(id))
+	string_view id = user::getId(req);
+	bool hasFork;
+	if(id.size() != idLen_ && !(hasFork = (id.size() == forkedIdLen_)))
 	{
 		if(negativeCallback)
 			negativeCallback();
 		else
-			positiveCallback();
+			positiveCallback("");
 		return;
 	}
 
-	if(User::get(id, true)) // Is in a room and logged in
+	string_view sessionId;
+	if(idFormatValidator_)
+	{
+		if(hasFork)
+		{
+			if(!idFormatValidator_(sessionId = id.substr(0, idLen_)) ||
+				!idFormatValidator_(id.substr(idLen_)))
+			{
+				if(negativeCallback)
+					negativeCallback();
+				else
+					positiveCallback("");
+			}
+		}
+		else if(!idFormatValidator_(id))
+		{
+			if(negativeCallback)
+				negativeCallback();
+			else
+				positiveCallback("");
+		}
+		return;
+	}
+
+	if(UserPtr user = User::get(id, true)) // Is in a room and logged in
 	{
 		if(positiveCallback)
-			positiveCallback();
+		{
+			string forkedId;
+			if(sessionVerificationCallback_ && !hasFork)
+			{
+				std::any extraContext;
+				if(extraContextGenerator_)
+					extraContext = extraContextGenerator_(req);
+
+				// If we were unable to verify the session, we fork
+				if(!sessionVerificationCallback_(std::move(user), extraContext))
+				{
+					forkedId.reserve(id.size() * 2);
+					forkedId = id;
+					forkedId += generateId();
+					User::create(std::move(forkedId));
+				}
+			}
+			positiveCallback(std::move(forkedId));
+		}
 		else
 			negativeCallback();
 		return;
@@ -423,27 +478,43 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 			id = std::move(id),
 			extraContext = std::move(extraContext),
 			positiveCallback = std::move(positiveCallback),
-			negativeCallback = std::move(negativeCallback)
+			negativeCallback = std::move(negativeCallback),
+			sessionId = std::move(sessionId)
 		]()
 	{
-		auto data = sessionValidationCallback_(id, extraContext);
+		bool shouldFork = false;
+		auto data = sessionValidationCallback_(sessionId, extraContext, shouldFork);
 		if(!data.has_value()) // Incorrect credentials
 		{
 			if(negativeCallback)
 				negativeCallback();
 			else
-				positiveCallback();
+				positiveCallback("");
 			return;
 		}
 
 		// Successful session validation
 
-		UserPtr user = std::move(User::create(id));
+		string actualId;
+		if(shouldFork && id.size() == sessionId.size()) // Suspicious session, fork the session to not disturb the real user
+		{
+			actualId.reserve(id.size() * 2);
+			actualId = id;
+			actualId += generateId();
+		}
+		else
+			actualId = id;
+
+		UserPtr user = std::move(
+			User::create(
+				string(actualId)
+			)
+		);
 		if(postValidationCallback_)
 			postValidationCallback_(std::move(user), std::move(data));
 
 		if(positiveCallback)
-			positiveCallback();
+			positiveCallback(std::move(actualId));
 		else
 			negativeCallback();
 	});
@@ -453,11 +524,19 @@ void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, Fi
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)]()
+		[fcb, fccb = std::move(fccb)](string&& overriddenId)
 		{
-			fccb();
+			if(overriddenId.empty())
+			{
+				fccb();
+				return;
+			}
+
+			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE); // TODO: Use a status code that is not used normally, to show partial success
+			generateIdFor(resp, overriddenId);
+			fcb(resp);
 		},
-		[fcb = std::move(fcb)]()
+		[fcb]()
 		{
 			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
 			removeIdFor(resp);
@@ -470,9 +549,12 @@ void drogon::user::filter::api::UnloggedIn::doFilter(const HttpRequestPtr& req, 
 {
 	loggedInFilter(
 		req,
-		[fcb = std::move(fcb)]()
+		[fcb = std::move(fcb)](string&& overriddenId)
 		{
-			fcb(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
+			if(!overriddenId.empty())
+				generateIdFor(resp, overriddenId);
+			fcb(resp);
 		},
 		[fccb = std::move(fccb)]()
 		{
@@ -485,10 +567,20 @@ void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, F
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)]()
+		[fcb, fccb = std::move(fccb)](string&& overriddenId)
 		{
-			fccb();
-		}, hasLoginRedirect_ ? [fcb = std::move(fcb)]()
+			if(overriddenId.empty())
+			{
+				fccb();
+				return;
+			}
+
+			// TODO: You may want to redirect somewhere
+			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE); // TODO: Use a status code that is not used normally, to show partial success
+			generateIdFor(resp, overriddenId);
+			fcb(resp);
+		},
+		hasLoginRedirect_ ? [fcb]()
 		{
 			auto resp = HttpResponse::newRedirectionResponse(loginPageUrl_);
 			removeIdFor(resp);
@@ -502,10 +594,13 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 {
 	loggedInFilter(
 		req,
-		hasLoggedInRedirect_ ? [fcb = std::move(fcb)]()
+		hasLoggedInRedirect_ ? [fcb = std::move(fcb)](string&& overriddenId)
 		{
-			fcb(HttpResponse::newRedirectionResponse(loggedInPageUrl_));
-		} : (std::function<void ()>)nullptr,
+			auto resp = HttpResponse::newRedirectionResponse(loggedInPageUrl_);
+			if(!overriddenId.empty())
+				generateIdFor(resp, overriddenId);
+			fcb(resp);
+		} : (std::function<void (string&&)>)nullptr,
 		[fccb = std::move(fccb)]()
 		{
 			fccb();
@@ -518,8 +613,8 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 
 /* User Class */
 
-User::User(const string& id) :
-	id_(id),
+User::User(string&& id) :
+	id_(std::move(id)),
 	conns_()
 {
 	enqueueForPurge(id_);
@@ -534,6 +629,11 @@ User::User(const string& id, const WebSocketConnectionPtr& conn, Room* room) :
 		}
 	})
 {}
+
+bool User::isFork() const
+{
+	return id_.size() > idLen_;
+}
 
 void User::setContext(const std::shared_ptr<void>& context)
 {

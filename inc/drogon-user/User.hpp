@@ -57,13 +57,39 @@ namespace drogon::user
 	/// The 2nd argument is any extra information needed by the callback, say User-Agent,
 	/// IP address, etc. It can be ignored if not used.
 	///
+	/// The 3rd parameter is optional to be set, you can set it to true if you believe the
+	/// session ID is suspicious or needs verification.
+	/// If set to true, then this new connection will be treated as a new session,
+	/// but still keeps track of the original session ID, to merge back with once the new
+	/// session is verified to be the same user as the original user.
+	///
 	/// A sample callback may look like:
 	/// auto userData = dbQuery("sessions", sessionId);
 	/// if(!userData.exists())
 	/// 	return {};
 	///
 	/// return std::move(userData);
-	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, const std::any& extraContext)>;
+	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, const std::any& extraContext, bool& shouldFork)>;
+
+	/// This callback is called when the user ID (session ID) exists in memory, and
+	/// it validates the session ID with the extra context against the existing
+	/// user object in memory.
+	///
+	/// The 2nd argument is any extra information needed by the callback, say User-Agent,
+	/// IP address, etc. It can be ignored if not used.
+	///
+	/// Return true if it is valid, false otherwise.
+	///
+	/// If false is returned, then this new connection will be treated as a new session,
+	/// but still keeps track of the original session ID, to merge back with once the new
+	/// session is verified to be the same user as the original user.
+	///
+	/// A sample callback may look like:
+	/// if(user->ip != extraContext.ip)
+	/// 	return false;
+	///
+	/// return true;
+	using MemorySessionVerificationCallback = std::function<bool (const UserPtr& user, const std::any& extraContext)>;
 
 	/// This callback is called by the Logged In filters.
 	using IdFormatValidator = std::function<bool (std::string_view id)>;
@@ -190,6 +216,9 @@ namespace drogon::user
 		DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
 
 		/// Optional
+		MemorySessionVerificationCallback sessionVerificationCallback = nullptr,
+
+		/// Optional
 		UserLogoutNotifyCallback userLogoutNotifyCallback = nullptr,
 
 		/// Can be set to `nullptr` if no validation is desired.
@@ -256,7 +285,12 @@ namespace drogon::user
 	///
 	/// Only one of the two functions can be `nullptr`, in which case only one
 	/// of the callbacks will be called in either case
-	void loggedInFilter(const drogon::HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly = false);
+	void loggedInFilter(
+		const drogon::HttpRequestPtr& req,
+		std::function<void (std::string&& overriddenId)>&& positiveCallback,
+		std::function<void ()>&& negativeCallback,
+		bool checkIndexHtmlOnly = false
+	);
 }
 
 class Room;
@@ -300,7 +334,7 @@ private:
 	static void prolongPurge(std::string_view id);
 
 public:
-	User(const std::string& id);
+	User(std::string&& id);
 	User(const std::string& id, const drogon::WebSocketConnectionPtr& conn, Room* room);
 
 	User(const User&) = delete;
@@ -308,7 +342,7 @@ public:
 
 	/// This must only be called if the user is not in memory,
 	/// and user's presence in memory is needed in that instant.
-	static UserPtr create(std::string_view id);
+	static UserPtr create(std::string&& id);
 
 	static UserPtr get(std::string_view id, bool extendLifespan = false);
 	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false)
@@ -324,6 +358,14 @@ public:
 	{
 		return id_;
 	}
+
+	/// If this user object is a fork of an actual user
+	bool isFork() const;
+	/// Merges this fork with the actual user, by transferring
+	/// all connections over and deleting this user object in
+	/// memory
+	void mergeFork(); // TODO: You may be better off having the mergeFork be in drogon::user instead,
+					  // because you need to truncate the ID cookie to only contain the original
 
 	/// Closes connections from all rooms
 	void forceClose();

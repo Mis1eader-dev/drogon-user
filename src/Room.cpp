@@ -45,9 +45,9 @@ Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
 	users_(std::move(users))
 {}
 
-UserPtr User::create(string_view id)
+UserPtr User::create(string&& id)
 {
-	UserPtr user = std::make_shared<User>(string(id));
+	UserPtr user = std::make_shared<User>(std::move(id));
 
 	auto pair = std::make_pair(user->id(), user);
 	{
@@ -240,7 +240,13 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 			);
 		}
 		else // Unavailable anywhere
-			user = std::move(User::create(id, conn, this));
+			user = std::move(
+				User::create(
+					string(id),
+					conn,
+					this
+				)
+			);
 	}
 
 	conn->setContext(user);
