@@ -216,21 +216,21 @@ namespace drogon::user
 		DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
 
 		/// Optional
-		MemorySessionVerificationCallback sessionVerificationCallback = nullptr,
+		MemorySessionVerificationCallback&& sessionVerificationCallback = nullptr,
 
 		/// Optional
-		UserLogoutNotifyCallback userLogoutNotifyCallback = nullptr,
+		UserLogoutNotifyCallback&& userLogoutNotifyCallback = nullptr,
 
 		/// Can be set to `nullptr` if no validation is desired.
 		///
 		/// NOTE: Even if set to `nullptr`, the length is still checked.
-		IdFormatValidator idValidator = drogon::utils::isBase64,
+		IdFormatValidator&& idValidator = drogon::utils::isBase64,
 
 		/// Optional
-		ExtraContextGenerator extraContextGenerator = nullptr,
+		ExtraContextGenerator&& extraContextGenerator = nullptr,
 
 		/// Optional
-		DatabasePostValidationCallback postValidationCallback = nullptr,
+		DatabasePostValidationCallback&& postValidationCallback = nullptr,
 
 		uint8_t minimumIdentifierLength = 3,
 		uint8_t maximumIdentifierLength = 254,

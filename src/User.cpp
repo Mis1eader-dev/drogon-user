@@ -101,11 +101,11 @@ void user::configureDatabase(
 	DatabaseSessionValidationCallback&& sessionValidationCallback,
 	DatabaseLoginWriteCallback&& loginWriteCallback,
 	DatabaseSessionInvalidationCallback&& sessionInvalidationCallback,
-	MemorySessionVerificationCallback sessionVerificationCallback,
-	UserLogoutNotifyCallback userLogoutNotifyCallback,
-	IdFormatValidator idFormatValidator,
-	ExtraContextGenerator extraContextGenerator,
-	DatabasePostValidationCallback postValidationCallback,
+	MemorySessionVerificationCallback&& sessionVerificationCallback,
+	UserLogoutNotifyCallback&& userLogoutNotifyCallback,
+	IdFormatValidator&& idFormatValidator,
+	ExtraContextGenerator&& extraContextGenerator,
+	DatabasePostValidationCallback&& postValidationCallback,
 	uint8_t minimumIdentifierLength,
 	uint8_t maximumIdentifierLength,
 	uint8_t minimumPasswordLength,
@@ -118,9 +118,9 @@ void user::configureDatabase(
 	sessionValidationCallback_ = std::move(sessionValidationCallback);
 	sessionVerificationCallback_ = std::move(sessionVerificationCallback);
 	loginWriteCallback_ = std::move(loginWriteCallback);
-	idFormatValidator_ = idFormatValidator;
-	extraContextGenerator_ = extraContextGenerator;
-	postValidationCallback_ = postValidationCallback;
+	idFormatValidator_ = std::move(idFormatValidator);
+	extraContextGenerator_ = std::move(extraContextGenerator);
+	postValidationCallback_ = std::move(postValidationCallback);
 	loginPageUrl_ = std::move(loginPageUrl);
 	loggedInPageUrl_ = std::move(loggedInPageUrl);
 	hasLoginRedirect_ = !loginPageUrl_.empty();
