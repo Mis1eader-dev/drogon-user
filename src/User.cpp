@@ -36,7 +36,7 @@ namespace drogon::user
 #endif
 }
 
-static string idCookieKey_ = "ID";
+static string idCookieKey_ = "ID", userObjectKeyWithinFilters_;
 static uint8_t idUnencodedLen_, idLen_;
 static int maxAge_ = 86400;
 static Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
@@ -57,6 +57,7 @@ static trantor::ConcurrentTaskQueue taskQueue_(std::thread::hardware_concurrency
 
 void user::configure(
 	string_view idCookieKey,
+	string_view userObjectKeyWithinFilters,
 	int idCookieMaxAge,
 	Cookie::SameSite sameSite,
 	bool httpOnly,
@@ -68,6 +69,7 @@ void user::configure(
 	IdEncoder&& idEncoder)
 {
 	idCookieKey_ = idCookieKey;
+	userObjectKeyWithinFilters_ = userObjectKeyWithinFilters;
 	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
 	maxAge_ = idCookieMaxAge;
@@ -402,8 +404,9 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 		return;
 	}
 
-	if(User::get(id, true)) // Is in a room and logged in
+	if(UserPtr user = User::get(id, true)) // Is in a room and logged in
 	{
+		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
 		if(positiveCallback)
 			positiveCallback();
 		else
@@ -440,7 +443,9 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 
 		UserPtr user = std::move(User::create(id));
 		if(postValidationCallback_)
-			postValidationCallback_(std::move(user), std::move(data));
+			postValidationCallback_(user, std::move(data));
+
+		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
 
 		if(positiveCallback)
 			positiveCallback();
@@ -534,6 +539,12 @@ User::User(const string& id, const WebSocketConnectionPtr& conn, Room* room) :
 		}
 	})
 {}
+
+UserPtr User::get(const drogon::HttpRequestPtr& req, bool extendLifespan)
+{
+	UserPtr user = req->attributes()->get<UserPtr>(userObjectKeyWithinFilters_);
+	return std::move(user ? user : get(drogon::user::getId(req), extendLifespan));
+}
 
 void User::setContext(const std::shared_ptr<void>& context)
 {

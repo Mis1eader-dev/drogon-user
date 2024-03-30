@@ -123,6 +123,7 @@ namespace drogon::user
 
 	void configure(
 		std::string_view idCookieKey,
+		std::string_view userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -135,16 +136,18 @@ namespace drogon::user
 	);
 	inline void configure(
 		std::string_view idCookieKey = "ID",
+		std::string_view userObjectKeyWithinFilters = "",
 		int idCookieMaxAge = 86400,
 		drogon::Cookie::SameSite sameSite = drogon::Cookie::SameSite::kStrict,
 		bool httpOnly = true,
 		bool secure = true,
 		double userCacheTimeout = 20.0)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
+		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
+		std::string_view userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -153,10 +156,11 @@ namespace drogon::user
 		uint8_t idCookieUnencodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
+		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
+		std::string_view userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -166,10 +170,11 @@ namespace drogon::user
 		uint8_t idCookieEncodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
+		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
 		std::string_view idCookieKey,
+		std::string_view userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -179,7 +184,7 @@ namespace drogon::user
 		IdGenerator&& idGenerator,
 		IdEncoder&& idEncoder)
 	{
-		configure(idCookieKey, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
+		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
 	}
 
 	void configureDatabase(
@@ -311,10 +316,11 @@ public:
 	static UserPtr create(std::string_view id);
 
 	static UserPtr get(std::string_view id, bool extendLifespan = false);
-	static inline UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false)
-	{
-		return std::move(get(drogon::user::getId(req), extendLifespan));
-	}
+	/// If one of the 4 provided filters has been hit before calling this method,
+	/// then the User object within the request will be returned.
+	///
+	/// Otherwise it will be a global lookup of the user.
+	static UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false);
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
 		return conn->getContext<User>();
