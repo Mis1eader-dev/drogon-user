@@ -302,7 +302,14 @@ private:
 	static void enqueueForPurge(std::string_view id);
 
 	/// Extends the purge if it has already been enqueued for purging
+	///
+	/// NOTE: The id must come from the user object itself
 	static void prolongPurge(std::string_view id);
+
+	/// Extends the purge if any one of them have already been enqueued for purging
+	///
+	/// NOTE: The id must come from the user object itself
+	static void prolongPurges(const std::vector<std::string_view>& ids);
 
 public:
 	User(const std::string& id);

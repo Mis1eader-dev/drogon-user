@@ -124,6 +124,22 @@ void User::prolongPurge(string_view id)
 	find->second = enqueuePurge(id);
 }
 
+void User::prolongPurges(const std::vector<string_view>& ids)
+{
+	auto loop = drogon::app().getLoop();
+
+	scoped_lock lock(::timeoutsMutex_);
+	for(string_view id : ids)
+	{
+		auto find = ::timeouts_.find(id);
+		if(find == ::timeouts_.end())
+			continue;
+
+		loop->invalidateTimer(find->second);
+		find->second = enqueuePurge(id);
+	}
+}
+
 void User::forceClose()
 {
 	{
@@ -181,14 +197,19 @@ void User::forceClose()
 
 UserPtr User::get(string_view id, bool extendLifespan)
 {
-	shared_lock lock(::mutex_);
-	auto find = ::allUsers_.find(id);
-	if(find == ::allUsers_.end())
-		return nullptr;
+	UserPtr user = nullptr;
+	{
+		shared_lock lock(::mutex_);
+		auto find = ::allUsers_.find(id);
+		if(find == ::allUsers_.end())
+			return std::move(user);
 
-	UserPtr user = find->second;
+		user = find->second;
+	}
+
 	if(extendLifespan)
 		User::prolongPurge(user->id_);
+
 	return std::move(user);
 }
 
@@ -258,8 +279,10 @@ UserPtr Room::get(std::string_view id, bool extendLifespan) const
 
 		user = find->second;
 	}
+
 	if(extendLifespan)
 		User::prolongPurge(user->id_);
+
 	return std::move(user);
 }
 
