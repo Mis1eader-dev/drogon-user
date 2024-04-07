@@ -129,10 +129,11 @@ void User::prolongPurges(const std::vector<string_view>& ids)
 	auto loop = drogon::app().getLoop();
 
 	scoped_lock lock(::timeoutsMutex_);
+	auto end = ::timeouts_.end();
 	for(string_view id : ids)
 	{
 		auto find = ::timeouts_.find(id);
-		if(find == ::timeouts_.end())
+		if(find == end)
 			continue;
 
 		loop->invalidateTimer(find->second);
@@ -199,7 +200,7 @@ UserPtr User::get(string_view id, bool extendLifespan)
 {
 	UserPtr user = nullptr;
 	{
-		shared_lock lock(::mutex_);
+		shared_lock slock(::mutex_);
 		auto find = ::allUsers_.find(id);
 		if(find == ::allUsers_.end())
 			return std::move(user);
@@ -272,7 +273,7 @@ UserPtr Room::get(std::string_view id, bool extendLifespan) const
 {
 	UserPtr user = nullptr;
 	{
-		shared_lock lock(mutex_);
+		shared_lock slock(mutex_);
 		auto find = users_.find(id);
 		if(find == users_.end())
 			return std::move(user);
@@ -356,7 +357,7 @@ void Room::notify(const UserPtr& user, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
 	const auto& connsMap = user->conns_;
-	shared_lock lock(user->mutex_);
+	shared_lock slock(user->mutex_);
 	const auto find = connsMap.find(this);
 	if(find == connsMap.end())
 		return;
@@ -376,7 +377,7 @@ void Room::notify(const UserPtr& user, Json::Value& json,
 void Room::notifyAll(const char* msg, uint64_t len,
 	const WebSocketMessageType type)
 {
-	shared_lock lock(mutex_);
+	shared_lock slock(mutex_);
 	for(const auto& [_, user] : users_)
 		notify(user, msg, len, type);
 }
@@ -392,7 +393,7 @@ void Room::notifyAll(Json::Value& json,
 void Room::notifyAllExcept(const UserPtr& user, const char* msg,
 	uint64_t len, const WebSocketMessageType type)
 {
-	shared_lock lock(mutex_);
+	shared_lock slock(mutex_);
 	auto it = users_.cbegin();
 	const auto end = users_.cend();
 	for(; it != end; ++it)
@@ -424,7 +425,7 @@ void Room::notifyAllExcept(const WebSocketConnectionPtr& conn, const char* msg,
 	notifyAllExcept(user, msg, len, type);
 
 	const auto& connsMap = user->conns_;
-	shared_lock lock(user->mutex_);
+	shared_lock slock(user->mutex_);
 	const auto find = connsMap.find(this);
 	if(find == connsMap.end())
 		return;
