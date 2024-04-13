@@ -402,5 +402,7 @@ public:
 	///
 	/// Else, it returns groups.begin() only when the size of groups is exactly the predicate.
 	GroupPtr firstGroup(size_t sizePredicate = 0) const;
+
+	std::vector<GroupPtr> groups() const;
 #endif
 };
