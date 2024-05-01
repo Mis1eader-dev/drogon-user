@@ -261,7 +261,12 @@ namespace drogon::user
 	///
 	/// Only one of the two functions can be `nullptr`, in which case only one
 	/// of the callbacks will be called in either case
-	void loggedInFilter(const drogon::HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly = false);
+	void loggedInFilter(
+		const drogon::HttpRequestPtr& req,
+		std::function<void (bool hasCookie)>&& positiveCallback,
+		std::function<void (bool hasCookie)>&& negativeCallback,
+		bool checkIndexHtmlOnly = false
+	);
 }
 
 class Room;

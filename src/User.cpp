@@ -383,7 +383,11 @@ namespace drogon::user::filter
 	}
 }
 
-void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void ()>&& positiveCallback, std::function<void ()>&& negativeCallback, bool checkIndexHtmlOnly)
+void drogon::user::loggedInFilter(
+	const HttpRequestPtr& req,
+	std::function<void (bool hasCookie)>&& positiveCallback,
+	std::function<void (bool hasCookie)>&& negativeCallback,
+	bool checkIndexHtmlOnly)
 {
 	/*if(checkIndexHtmlOnly) // TODO:
 	{
@@ -394,13 +398,22 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 	}*/
 
 	auto id = user::getId(req);
+	if(id.empty())
+	{
+		if(negativeCallback)
+			negativeCallback(false);
+		else
+			positiveCallback(false);
+		return;
+	}
+
 	if(id.size() != idLen_ ||
 		idFormatValidator_ && !idFormatValidator_(id))
 	{
 		if(negativeCallback)
-			negativeCallback();
+			negativeCallback(true);
 		else
-			positiveCallback();
+			positiveCallback(true);
 		return;
 	}
 
@@ -408,9 +421,9 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 	{
 		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
 		if(positiveCallback)
-			positiveCallback();
+			positiveCallback(true);
 		else
-			negativeCallback();
+			negativeCallback(true);
 		return;
 	}
 
@@ -433,9 +446,9 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 		if(!data.has_value()) // Incorrect credentials
 		{
 			if(negativeCallback)
-				negativeCallback();
+				negativeCallback(true);
 			else
-				positiveCallback();
+				positiveCallback(true);
 			return;
 		}
 
@@ -448,9 +461,9 @@ void drogon::user::loggedInFilter(const HttpRequestPtr& req, std::function<void 
 		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
 
 		if(positiveCallback)
-			positiveCallback();
+			positiveCallback(true);
 		else
-			negativeCallback();
+			negativeCallback(true);
 	});
 }
 
@@ -458,14 +471,15 @@ void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, Fi
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)]()
+		[fccb = std::move(fccb)](bool hasCookie)
 		{
 			fccb();
 		},
-		[fcb = std::move(fcb)]()
+		[fcb = std::move(fcb)](bool hasCookie)
 		{
 			auto resp = HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE);
-			removeIdFor(resp);
+			if(hasCookie)
+				removeIdFor(resp);
 			fcb(resp);
 		}
 	);
@@ -475,11 +489,11 @@ void drogon::user::filter::api::UnloggedIn::doFilter(const HttpRequestPtr& req, 
 {
 	loggedInFilter(
 		req,
-		[fcb = std::move(fcb)]()
+		[fcb = std::move(fcb)](bool hasCookie)
 		{
 			fcb(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 		},
-		[fccb = std::move(fccb)]()
+		[fccb = std::move(fccb)](bool hasCookie)
 		{
 			fccb();
 		}
@@ -490,15 +504,16 @@ void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, F
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)]()
+		[fccb = std::move(fccb)](bool hasCookie)
 		{
 			fccb();
-		}, hasLoginRedirect_ ? [fcb = std::move(fcb)]()
+		}, hasLoginRedirect_ ? [fcb = std::move(fcb)](bool hasCookie)
 		{
 			auto resp = HttpResponse::newRedirectionResponse(loginPageUrl_);
-			removeIdFor(resp);
+			if(hasCookie)
+				removeIdFor(resp);
 			fcb(resp);
-		} : (std::function<void ()>)nullptr,
+		} : (std::function<void (bool hasCookie)>)nullptr,
 		true
 	);
 }
@@ -507,11 +522,11 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 {
 	loggedInFilter(
 		req,
-		hasLoggedInRedirect_ ? [fcb = std::move(fcb)]()
+		hasLoggedInRedirect_ ? [fcb = std::move(fcb)](bool hasCookie)
 		{
 			fcb(HttpResponse::newRedirectionResponse(loggedInPageUrl_));
-		} : (std::function<void ()>)nullptr,
-		[fccb = std::move(fccb)]()
+		} : (std::function<void (bool hasCookie)>)nullptr,
+		[fccb = std::move(fccb)](bool hasCookie)
 		{
 			fccb();
 		},
