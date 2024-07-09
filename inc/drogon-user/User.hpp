@@ -49,7 +49,7 @@ namespace drogon::user
 	/// 	return {};
 	///
 	/// return std::move(userData);
-	using DatabaseLoginValidationCallback = std::function<std::any (std::string_view identifier, std::string_view password, const std::any& extraContext)>;
+	using DatabaseLoginValidationCallback = std::function<std::any (std::string_view identifier, std::string_view password, std::any&& extraContext)>;
 
 	/// This callback is called when the user ID (session ID) does not exist in memory, and
 	/// it validates the session ID with the database to confirm it is a valid identity.
@@ -63,7 +63,7 @@ namespace drogon::user
 	/// 	return {};
 	///
 	/// return std::move(userData);
-	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, const std::any& extraContext)>;
+	using DatabaseSessionValidationCallback = std::function<std::any (std::string_view sessionId, std::any&& extraContext)>;
 
 	/// This callback is called by the Logged In filters.
 	using IdFormatValidator = std::function<bool (std::string_view id)>;
@@ -90,7 +90,7 @@ namespace drogon::user
 	/// group = new Group(groupID, groupData.name, user, groupData.color);
 	/// dataCtx->group = group;
 	/// BusinessLogic::addGroup(group);
-	using DatabasePostValidationCallback = std::function<void (const UserPtr& user, const std::any& data)>;
+	using DatabasePostValidationCallback = std::function<void (const UserPtr& user, std::any& data)>;
 
 	/// This callback is called just before sending login info or session ID for
 	/// validation.
@@ -106,7 +106,7 @@ namespace drogon::user
 	///
 	/// A sample callback may look like:
 	/// dbWrite("sessions", sessionId);
-	using DatabaseLoginWriteCallback = std::function<void (std::string_view sessionId, std::string_view identifier, const std::any& data)>;
+	using DatabaseLoginWriteCallback = std::function<void (std::string_view sessionId, std::string_view identifier, std::any&& data)>;
 
 	/// This callback is called by a [/logout] endpoint to remove a session.
 	///

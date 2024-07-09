@@ -200,9 +200,9 @@ void user::configureDatabase(
 			extraContext = std::move(extraContext),
 			callback = std::move(callback),
 			loginValidationCallback = std::move(loginValidationCallback)
-		]()
+		]() mutable
 		{
-			auto data = loginValidationCallback(identifier, password, extraContext);
+			auto data = loginValidationCallback(identifier, password, std::move(extraContext));
 			if(!data.has_value()) // Incorrect identifier or password
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
@@ -229,7 +229,7 @@ void user::configureDatabase(
 
 			// ^ Memory Cache: OK
 
-			loginWriteCallback_(sessionId, identifier, data);
+			loginWriteCallback_(sessionId, identifier, std::move(data));
 
 			// ^ Database: OK
 		});
@@ -440,9 +440,9 @@ void drogon::user::loggedInFilter(
 			extraContext = std::move(extraContext),
 			positiveCallback = std::move(positiveCallback),
 			negativeCallback = std::move(negativeCallback)
-		]()
+		]() mutable
 	{
-		auto data = sessionValidationCallback_(id, extraContext);
+		auto data = sessionValidationCallback_(id, std::move(extraContext));
 		if(!data.has_value()) // Incorrect credentials
 		{
 			if(negativeCallback)
@@ -456,7 +456,7 @@ void drogon::user::loggedInFilter(
 
 		UserPtr user = std::move(User::create(id));
 		if(postValidationCallback_)
-			postValidationCallback_(user, std::move(data));
+			postValidationCallback_(user, data);
 
 		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
 
