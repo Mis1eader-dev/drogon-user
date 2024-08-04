@@ -122,8 +122,8 @@ namespace drogon::user
 	using UserLogoutNotifyCallback = std::function<void (const UserPtr& user)>;
 
 	void configure(
-		std::string_view idCookieKey,
-		std::string_view userObjectKeyWithinFilters,
+		std::string idCookieKey,
+		std::string userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -135,19 +135,19 @@ namespace drogon::user
 		IdEncoder&& idEncoder
 	);
 	inline void configure(
-		std::string_view idCookieKey = "ID",
-		std::string_view userObjectKeyWithinFilters = "",
+		std::string idCookieKey = "ID",
+		std::string userObjectKeyWithinFilters = "",
 		int idCookieMaxAge = 86400,
 		drogon::Cookie::SameSite sameSite = drogon::Cookie::SameSite::kStrict,
 		bool httpOnly = true,
 		bool secure = true,
 		double userCacheTimeout = 20.0)
 	{
-		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
 	}
 	inline void configure(
-		std::string_view idCookieKey,
-		std::string_view userObjectKeyWithinFilters,
+		std::string idCookieKey,
+		std::string userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -156,11 +156,11 @@ namespace drogon::user
 		uint8_t idCookieUnencodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
-		std::string_view idCookieKey,
-		std::string_view userObjectKeyWithinFilters,
+		std::string idCookieKey,
+		std::string userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -170,11 +170,11 @@ namespace drogon::user
 		uint8_t idCookieEncodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
 	}
 	inline void configure(
-		std::string_view idCookieKey,
-		std::string_view userObjectKeyWithinFilters,
+		std::string idCookieKey,
+		std::string userObjectKeyWithinFilters,
 		int idCookieMaxAge,
 		drogon::Cookie::SameSite sameSite,
 		bool httpOnly,
@@ -184,7 +184,7 @@ namespace drogon::user
 		IdGenerator&& idGenerator,
 		IdEncoder&& idEncoder)
 	{
-		configure(idCookieKey, userObjectKeyWithinFilters, idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
 	}
 
 	void configureDatabase(
@@ -212,18 +212,18 @@ namespace drogon::user
 		uint8_t maximumIdentifierLength = 254,
 		uint8_t minimumPasswordLength = 8,
 		uint8_t maximumPasswordLength = 128,
-		const std::string& loginValidationEndpoint = "/api/login",
+		const std::string& loginEndpoint = "/api/login",
 		const std::string& logoutEndpoint = "/api/logout",
 
 		/// Set to empty to disable redirect from unauthorized pages
 		///
 		/// Active on handlers with the filter "drogon::user::filter::page::UnloggedIn"
-		const std::string& unloggedInRedirectTo = "/login",
+		std::string unloggedInRedirectTo = "/login",
 
 		/// Set to empty to disable redirect from login page when already logged in
 		///
 		/// Active on handlers with the filter "drogon::user::filter::page::LoggedIn"
-		const std::string& loggedInRedirectTo = "/admin"
+		std::string loggedInRedirectTo = "/admin"
 	);
 
 #ifdef ENABLE_OFFLINE_CALLBACK
@@ -231,7 +231,7 @@ namespace drogon::user
 #endif
 
 	std::string generateId();
-	void generateIdFor(const drogon::HttpResponsePtr& resp, const std::string& id);
+	void generateIdFor(const drogon::HttpResponsePtr& resp, std::string id);
 	inline void generateIdFor(const drogon::HttpResponsePtr& resp)
 	{
 		generateIdFor(resp, std::move(generateId()));
@@ -263,7 +263,7 @@ namespace drogon::user
 	/// of the callbacks will be called in either case
 	void loggedInFilter(
 		const drogon::HttpRequestPtr& req,
-		std::function<void (bool hasCookie)>&& positiveCallback,
+		std::function<void ()>&& positiveCallback,
 		std::function<void (bool hasCookie)>&& negativeCallback,
 		bool checkIndexHtmlOnly = false
 	);
@@ -317,8 +317,8 @@ private:
 	static void prolongPurges(const std::vector<std::string_view>& ids);
 
 public:
-	User(const std::string& id);
-	User(const std::string& id, const drogon::WebSocketConnectionPtr& conn, Room* room);
+	User(std::string id);
+	User(std::string id, const drogon::WebSocketConnectionPtr& conn, Room* room);
 
 	User(const User&) = delete;
 	User& operator = (const User&) = delete;

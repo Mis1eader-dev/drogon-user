@@ -36,13 +36,15 @@ namespace drogon::user
 #endif
 }
 
-static string idCookieKey_ = "ID", userObjectKeyWithinFilters_;
+static string
+	idCookieKey_,
+	userObjectKeyWithinFilters_;
 static uint8_t idUnencodedLen_, idLen_;
-static int maxAge_ = 86400;
-static Cookie::SameSite sameSite_ = Cookie::SameSite::kStrict;
+static int maxAge_;
+static Cookie::SameSite sameSite_;
 static bool
-	httpOnly_ = true,
-	secure_ = true;
+	httpOnly_,
+	secure_;
 static user::IdGenerator idGenerator_;
 static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
@@ -50,14 +52,14 @@ static user::DatabaseLoginWriteCallback loginWriteCallback_;
 static user::IdFormatValidator idFormatValidator_;
 static user::DatabasePostValidationCallback postValidationCallback_;
 static user::ExtraContextGenerator extraContextGenerator_;
-static bool hasLoginRedirect_ = false, hasLoggedInRedirect_ = false;
+static bool hasLoginRedirect_, hasLoggedInRedirect_;
 static string loginPageUrl_, loggedInPageUrl_;
 
 static trantor::ConcurrentTaskQueue taskQueue_(std::thread::hardware_concurrency(), "");
 
 void user::configure(
-	string_view idCookieKey,
-	string_view userObjectKeyWithinFilters,
+	string idCookieKey,
+	string userObjectKeyWithinFilters,
 	int idCookieMaxAge,
 	Cookie::SameSite sameSite,
 	bool httpOnly,
@@ -68,8 +70,8 @@ void user::configure(
 	IdGenerator&& idGenerator,
 	IdEncoder&& idEncoder)
 {
-	idCookieKey_ = idCookieKey;
-	userObjectKeyWithinFilters_ = userObjectKeyWithinFilters;
+	idCookieKey_ = std::move(idCookieKey);
+	userObjectKeyWithinFilters_ = std::move(userObjectKeyWithinFilters);
 	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
 	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
 	maxAge_ = idCookieMaxAge;
@@ -108,10 +110,10 @@ void user::configureDatabase(
 	uint8_t maximumIdentifierLength,
 	uint8_t minimumPasswordLength,
 	uint8_t maximumPasswordLength,
-	const string& loginValidationEndpoint,
+	const string& loginEndpoint,
 	const string& logoutEndpoint,
-	const string& loginPageUrl,
-	const string& loggedInPageUrl)
+	string loginPageUrl,
+	string loggedInPageUrl)
 {
 	sessionValidationCallback_ = std::move(sessionValidationCallback);
 	loginWriteCallback_ = std::move(loginWriteCallback);
@@ -129,8 +131,9 @@ void user::configureDatabase(
 			minimumIdentifierLength + 1/* : */ + minimumPasswordLength
 		);
 
-	// Login endpoint
-	app().registerHandler(loginValidationEndpoint,
+	app()
+		// Login endpoint
+		.registerHandler(loginEndpoint,
 		[
 			minimumIdentifierLength,
 			maximumIdentifierLength,
@@ -139,151 +142,154 @@ void user::configureDatabase(
 			loginValidationCallback = std::move(loginValidationCallback)
 		]
 		(const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
-	{
-		string_view authorizationPayload = req->getHeader("Authorization");
-		auto len = authorizationPayload.size();
-		if(len < authorizationHeaderMinLen_)
 		{
-			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-			return;
-		}
-
-		if(!authorizationPayload.starts_with(authorizationHeaderPrefix) &&
-			!authorizationPayload.starts_with(authorizationHeaderPrefix2))
-		{
-			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-			return;
-		}
-
-		authorizationPayload.remove_prefix(authorizationHeaderPrefixLen);
-
-		string payload = utils::base64Decode(authorizationPayload);
-		auto colonIdx = payload.find(':');
-		if(colonIdx == string::npos)
-		{
-			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-			return;
-		}
-
-		// colonIdx = identifierLen
-		if(colonIdx < minimumIdentifierLength || colonIdx > maximumIdentifierLength)
-		{
-			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-			return;
-		}
-
-		authorizationPayload = payload; // view
-		string_view identifier = authorizationPayload.substr(0, colonIdx);
-
-		authorizationPayload.remove_prefix(colonIdx + 1); // authorizationPayload = password
-		len = authorizationPayload.size();
-		if(len < minimumPasswordLength)
-		{
-			callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-			return;
-		}
-
-		if(len > maximumPasswordLength) // truncate the password if it exceeds the limit
-			authorizationPayload.remove_suffix(len - maximumPasswordLength);
-
-		// ^ Length: OK
-
-		std::any extraContext;
-		if(extraContextGenerator_)
-			extraContext = extraContextGenerator_(req);
-
-		taskQueue_.runTaskInQueue(
-		[
-			req = std::move(req),
-			identifier,
-			password = std::move(authorizationPayload), // authorizationPayload = password
-			extraContext = std::move(extraContext),
-			callback = std::move(callback),
-			loginValidationCallback = std::move(loginValidationCallback)
-		]() mutable
-		{
-			auto data = loginValidationCallback(identifier, password, std::move(extraContext));
-			if(!data.has_value()) // Incorrect identifier or password
+			string_view authorizationPayload = req->getHeader("Authorization");
+			auto len = authorizationPayload.size();
+			if(len < authorizationHeaderMinLen_)
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 				return;
 			}
 
-			// ^ Validation: OK
-
-			string sessionId = generateId();
-
-			// ^ ID Generation: OK
-
+			if(!authorizationPayload.starts_with(authorizationHeaderPrefix) &&
+				!authorizationPayload.starts_with(authorizationHeaderPrefix2))
 			{
-				auto resp = HttpResponse::newHttpResponse(k200OK, CT_NONE);
-				generateIdFor(resp, sessionId);
-				callback(resp);
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
 			}
 
-			// ^ Response: OK
+			authorizationPayload.remove_prefix(authorizationHeaderPrefixLen);
 
-			UserPtr user = std::move(User::create(sessionId));
-			if(postValidationCallback_)
-				postValidationCallback_(std::move(user), data);
+			string payload = utils::base64Decode(authorizationPayload);
+			auto colonIdx = payload.find(':');
+			if(colonIdx == string::npos)
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
 
-			// ^ Memory Cache: OK
+			// colonIdx = identifierLen
+			if(colonIdx < minimumIdentifierLength || colonIdx > maximumIdentifierLength)
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
 
-			loginWriteCallback_(sessionId, identifier, std::move(data));
+			authorizationPayload = payload; // view
+			string_view identifier = authorizationPayload.substr(0, colonIdx);
 
-			// ^ Database: OK
-		});
-	},
-	{
-		HttpMethod::Post
-	});
+			authorizationPayload.remove_prefix(colonIdx + 1); // authorizationPayload = password
+			len = authorizationPayload.size();
+			if(len < minimumPasswordLength)
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
 
-	// Logout endpoint
-	app().registerHandler(logoutEndpoint,
+			if(len > maximumPasswordLength) // truncate the password if it exceeds the limit
+				authorizationPayload.remove_suffix(len - maximumPasswordLength);
+
+			// ^ Length: OK
+
+			std::any extraContext;
+			if(extraContextGenerator_)
+				extraContext = extraContextGenerator_(req);
+
+			taskQueue_.runTaskInQueue(
+			[
+				req = std::move(req),
+				identifier,
+				password = std::move(authorizationPayload), // authorizationPayload = password
+				extraContext = std::move(extraContext),
+				callback = std::move(callback),
+				loginValidationCallback = std::move(loginValidationCallback)
+			]() mutable
+			{
+				auto data = loginValidationCallback(identifier, password, std::move(extraContext));
+				if(!data.has_value()) // Incorrect identifier or password
+				{
+					callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+					return;
+				}
+
+				// ^ Validation: OK
+
+				string sessionId = generateId();
+
+				// ^ ID Generation: OK
+
+				{
+					auto resp = HttpResponse::newHttpResponse(k200OK, CT_NONE);
+					generateIdFor(resp, sessionId);
+					callback(resp);
+				}
+
+				// ^ Response: OK
+
+				UserPtr user = std::move(User::create(sessionId));
+				if(postValidationCallback_)
+					postValidationCallback_(std::move(user), data);
+
+				// ^ Memory Cache: OK
+
+				loginWriteCallback_(sessionId, identifier, std::move(data));
+
+				// ^ Database: OK
+			});
+		},
+		{
+			HttpMethod::Post,
+		})
+
+
+
+		// Logout endpoint
+		.registerHandler(logoutEndpoint,
 		[
 			sessionInvalidationCallback = std::move(sessionInvalidationCallback),
 			userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
 		](const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
-	{
-		taskQueue_.runTaskInQueue(
-		[
-			req = std::move(req),
-			callback = std::move(callback),
-			sessionInvalidationCallback = std::move(sessionInvalidationCallback),
-			userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
-		]()
 		{
-			auto id = user::getId(req);
-			if(!sessionInvalidationCallback(id))
+			taskQueue_.runTaskInQueue(
+			[
+				req = std::move(req),
+				callback = std::move(callback),
+				sessionInvalidationCallback = std::move(sessionInvalidationCallback),
+				userLogoutNotifyCallback = std::move(userLogoutNotifyCallback)
+			]()
 			{
-				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
-				return;
-			}
+				auto id = user::getId(req);
+				if(!sessionInvalidationCallback(id))
+				{
+					callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+					return;
+				}
 
-			// ^ Database and Validation: OK
+				// ^ Database and Validation: OK
 
-			{
-				auto resp = HttpResponse::newHttpResponse(k200OK, CT_NONE);
-				removeIdFor(resp);
-				callback(resp);
-			}
+				{
+					auto resp = HttpResponse::newHttpResponse(k200OK, CT_NONE);
+					removeIdFor(resp);
+					callback(resp);
+				}
 
-			// ^ Response: OK
+				// ^ Response: OK
 
-			if(UserPtr user = User::get(id))
-			{
-				if(userLogoutNotifyCallback)
-					userLogoutNotifyCallback(user);
+				if(UserPtr user = User::get(id))
+				{
+					if(userLogoutNotifyCallback)
+						userLogoutNotifyCallback(user);
 
-				user->forceClose();
-			}
+					user->forceClose();
+				}
 
-			// ^ Close Connections: OK
-		});
-	},
-	{
-		HttpMethod::Delete
-	});
+				// ^ Close Connections: OK
+			});
+		},
+		{
+			HttpMethod::Delete,
+		})
+		;
 }
 
 #ifdef ENABLE_OFFLINE_CALLBACK
@@ -303,9 +309,9 @@ string user::generateId()
 	return id;
 }
 
-void user::generateIdFor(const HttpResponsePtr& resp, const string& id)
+void user::generateIdFor(const HttpResponsePtr& resp, string id)
 {
-	Cookie cookie(idCookieKey_, id);
+	Cookie cookie(idCookieKey_, std::move(id));
 	cookie.setPath("/");
 	cookie.setMaxAge(maxAge_);
 	cookie.setSameSite(sameSite_);
@@ -385,7 +391,7 @@ namespace drogon::user::filter
 
 void drogon::user::loggedInFilter(
 	const HttpRequestPtr& req,
-	std::function<void (bool hasCookie)>&& positiveCallback,
+	std::function<void ()>&& positiveCallback,
 	std::function<void (bool hasCookie)>&& negativeCallback,
 	bool checkIndexHtmlOnly)
 {
@@ -403,7 +409,7 @@ void drogon::user::loggedInFilter(
 		if(negativeCallback)
 			negativeCallback(false);
 		else
-			positiveCallback(false);
+			positiveCallback();
 		return;
 	}
 
@@ -413,15 +419,17 @@ void drogon::user::loggedInFilter(
 		if(negativeCallback)
 			negativeCallback(true);
 		else
-			positiveCallback(true);
+			positiveCallback();
 		return;
 	}
 
 	if(UserPtr user = User::get(id, true)) // Is in a room and logged in
 	{
-		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
+		auto& attrs = *(req->attributes());
+		attrs.insert(userObjectKeyWithinFilters_, std::move(user));
+
 		if(positiveCallback)
-			positiveCallback(true);
+			positiveCallback();
 		else
 			negativeCallback(true);
 		return;
@@ -448,7 +456,7 @@ void drogon::user::loggedInFilter(
 			if(negativeCallback)
 				negativeCallback(true);
 			else
-				positiveCallback(true);
+				positiveCallback();
 			return;
 		}
 
@@ -458,10 +466,11 @@ void drogon::user::loggedInFilter(
 		if(postValidationCallback_)
 			postValidationCallback_(user, data);
 
-		req->attributes()->insert(userObjectKeyWithinFilters_, std::move(user));
+		auto& attrs = *(req->attributes());
+		attrs.insert(userObjectKeyWithinFilters_, std::move(user));
 
 		if(positiveCallback)
-			positiveCallback(true);
+			positiveCallback();
 		else
 			negativeCallback(true);
 	});
@@ -471,7 +480,7 @@ void drogon::user::filter::api::LoggedIn::doFilter(const HttpRequestPtr& req, Fi
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)](bool hasCookie)
+		[req, fccb = std::move(fccb)]()
 		{
 			fccb();
 		},
@@ -489,7 +498,7 @@ void drogon::user::filter::api::UnloggedIn::doFilter(const HttpRequestPtr& req, 
 {
 	loggedInFilter(
 		req,
-		[fcb = std::move(fcb)](bool hasCookie)
+		[fcb = std::move(fcb)]()
 		{
 			fcb(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 		},
@@ -504,7 +513,7 @@ void drogon::user::filter::page::LoggedIn::doFilter(const HttpRequestPtr& req, F
 {
 	loggedInFilter(
 		req,
-		[fccb = std::move(fccb)](bool hasCookie)
+		[fccb = std::move(fccb)]()
 		{
 			fccb();
 		}, hasLoginRedirect_ ? [fcb = std::move(fcb)](bool hasCookie)
@@ -522,10 +531,10 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 {
 	loggedInFilter(
 		req,
-		hasLoggedInRedirect_ ? [fcb = std::move(fcb)](bool hasCookie)
+		hasLoggedInRedirect_ ? [fcb = std::move(fcb)]()
 		{
 			fcb(HttpResponse::newRedirectionResponse(loggedInPageUrl_));
-		} : (std::function<void (bool hasCookie)>)nullptr,
+		} : (std::function<void ()>)nullptr,
 		[fccb = std::move(fccb)](bool hasCookie)
 		{
 			fccb();
@@ -538,14 +547,14 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 
 /* User Class */
 
-User::User(const string& id) :
-	id_(id),
+User::User(string id) :
+	id_(std::move(id)),
 	conns_()
 {
 	enqueueForPurge(id_);
 }
-User::User(const string& id, const WebSocketConnectionPtr& conn, Room* room) :
-	id_(id),
+User::User(string id, const WebSocketConnectionPtr& conn, Room* room) :
+	id_(std::move(id)),
 	conns_({
 		{
 			room, {
