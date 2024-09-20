@@ -48,30 +48,25 @@ Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
 UserPtr User::create(string_view id)
 {
 	UserPtr user = std::make_shared<User>(string(id));
-
-	auto pair = std::make_pair(user->id(), user);
 	{
 		scoped_lock lock(::mutex_);
-		::allUsers_.insert(std::move(pair));
+		::allUsers_.emplace(user->id(), user);
 	}
-
-	return std::move(user);
+	return user;
 }
 UserPtr User::create(string_view id, const WebSocketConnectionPtr& conn, Room* room)
 {
 	UserPtr user = std::make_shared<User>(string(id), conn, room);
-
-	auto pair = std::make_pair(user->id(), user);
+	id = user->id();
 	{
 		scoped_lock lock(room->mutex_);
-		room->users_.insert(pair);
+		room->users_.emplace(id, user);
 	}
 	{
 		scoped_lock lock(::mutex_);
-		::allUsers_.insert(std::move(pair));
+		::allUsers_.emplace(id, user);
 	}
-
-	return std::move(user);
+	return user;
 }
 
 static inline trantor::TimerId enqueuePurge(string_view id)
@@ -203,7 +198,7 @@ UserPtr User::get(string_view id, bool extendLifespan)
 		shared_lock slock(::mutex_);
 		auto find = ::allUsers_.find(id);
 		if(find == ::allUsers_.end())
-			return std::move(user);
+			return user;
 
 		user = find->second;
 	}
@@ -211,7 +206,7 @@ UserPtr User::get(string_view id, bool extendLifespan)
 	if(extendLifespan)
 		User::prolongPurge(user->id_);
 
-	return std::move(user);
+	return user;
 }
 
 UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
@@ -243,30 +238,24 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 
 			{
 				scoped_lock lock(user->mutex_);
-				user->conns_.insert(
-					std::move(
-						std::pair<Room*, User::ConnsSet>(
-							this, {
-								conn
-							}
-						)
-					)
+				user->conns_.emplace(
+					this,
+					User::ConnsSet
+					{
+						conn
+					}
 				);
 			}
 
 			scoped_lock lock(mutex_);
-			users_.insert(
-				std::move(
-					std::make_pair(id, user)
-				)
-			);
+			users_.emplace(id, user);
 		}
 		else // Unavailable anywhere
-			user = std::move(User::create(id, conn, this));
+			user = User::create(id, conn, this);
 	}
 
 	conn->setContext(user);
-	return std::move(user);
+	return user;
 }
 
 UserPtr Room::get(std::string_view id, bool extendLifespan) const
@@ -276,7 +265,7 @@ UserPtr Room::get(std::string_view id, bool extendLifespan) const
 		shared_lock slock(mutex_);
 		auto find = users_.find(id);
 		if(find == users_.end())
-			return std::move(user);
+			return user;
 
 		user = find->second;
 	}
@@ -284,7 +273,7 @@ UserPtr Room::get(std::string_view id, bool extendLifespan) const
 	if(extendLifespan)
 		User::prolongPurge(user->id_);
 
-	return std::move(user);
+	return user;
 }
 
 UserPtr Room::remove(const UserPtr& user)
@@ -297,7 +286,7 @@ UserPtr Room::remove(const UserPtr& user)
 		scoped_lock lock(mutex_);
 		users_.erase(user->id());
 	}
-	return std::move(user);
+	return user;
 }
 UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 {
@@ -317,7 +306,7 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 		scoped_lock lock(mtx);
 		auto find = connsMap.find(this);
 		if(find == connsMap.end())
-			return std::move(user);
+			return user;
 
 		auto& connsSet = find->second;
 		if(connsSet.size() == 1) // Final connection to room
@@ -341,7 +330,7 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 		users_.erase(id);
 	}
 
-	return std::move(user);
+	return user;
 }
 
 void Room::notify(const WebSocketConnectionPtr& conn, Json::Value& json,

@@ -46,7 +46,6 @@ static bool
 	httpOnly_,
 	secure_;
 static user::IdGenerator idGenerator_;
-static user::IdEncoder idEncoder_;
 static user::DatabaseSessionValidationCallback sessionValidationCallback_;
 static user::DatabaseLoginWriteCallback loginWriteCallback_;
 static user::IdFormatValidator idFormatValidator_;
@@ -67,28 +66,28 @@ void user::configure(
 	double userCacheTimeout,
 	uint8_t idUnencodedLen,
 	uint8_t idEncodedLen,
-	IdGenerator&& idGenerator,
-	IdEncoder&& idEncoder)
+	IdGenerator&& idGenerator)
 {
 	idCookieKey_ = std::move(idCookieKey);
 	userObjectKeyWithinFilters_ = std::move(userObjectKeyWithinFilters);
 	idUnencodedLen_ = idUnencodedLen ? idUnencodedLen : 16;
-	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false);
+	idLen_ = idEncodedLen ? idEncodedLen : utils::base64EncodedLength(idUnencodedLen_, false/* Unpadded */);
 	maxAge_ = idCookieMaxAge;
 	sameSite_ = sameSite;
 	httpOnly_ = httpOnly;
 	secure_ = secure;
 	userCacheTimeout_ = userCacheTimeout;
 	idGenerator_ = std::move(
-		idGenerator ? idGenerator : [](string& id) -> void
+		idGenerator ? idGenerator : []() -> string
 		{
+			string id(idLen_, uint8_t(0));
 			utils::secureRandomBytes(id.data(), idUnencodedLen_);
-		}
-	);
-	idEncoder_ = std::move(
-		idEncoder ? idEncoder : [](string& idUnencoded) -> void
-		{
-			idUnencoded = utils::base64Encode(idUnencoded, true, false);
+			utils::base64Encode(
+				(const unsigned char*)id.data(), idLen_,
+				(unsigned char*)id.data(),
+				true/* URL safe */, false/* Unpadded */
+			);
+			return id;
 		}
 	);
 }
@@ -226,7 +225,7 @@ void user::configureDatabase(
 
 				// ^ Response: OK
 
-				UserPtr user = std::move(User::create(sessionId));
+				UserPtr user = User::create(sessionId);
 				if(postValidationCallback_)
 					postValidationCallback_(std::move(user), data);
 
@@ -295,18 +294,13 @@ void user::configureDatabase(
 #ifdef ENABLE_OFFLINE_CALLBACK
 void user::registerOfflineUserCallback(OfflineUserCallback&& cb)
 {
-	offlineUserCallbacks_.push_back(std::move(cb));
+	offlineUserCallbacks_.emplace_back(std::move(cb));
 }
 #endif
 
 string user::generateId()
 {
-	string id;
-	id.reserve(idLen_);
-	id.resize(idUnencodedLen_);
-	idGenerator_(id);
-	idEncoder_(id);
-	return id;
+	return idGenerator_();
 }
 
 void user::generateIdFor(const HttpResponsePtr& resp, string id)
@@ -462,7 +456,7 @@ void drogon::user::loggedInFilter(
 
 		// Successful session validation
 
-		UserPtr user = std::move(User::create(id));
+		UserPtr user = User::create(id);
 		if(postValidationCallback_)
 			postValidationCallback_(user, data);
 
@@ -567,7 +561,7 @@ User::User(string id, const WebSocketConnectionPtr& conn, Room* room) :
 UserPtr User::get(const drogon::HttpRequestPtr& req, bool extendLifespan)
 {
 	UserPtr user = req->attributes()->get<UserPtr>(userObjectKeyWithinFilters_);
-	return std::move(user ? user : get(drogon::user::getId(req), extendLifespan));
+	return user ? user : get(drogon::user::getId(req), extendLifespan);
 }
 
 void User::setContext(const std::shared_ptr<void>& context)

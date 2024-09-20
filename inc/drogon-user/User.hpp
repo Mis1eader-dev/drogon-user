@@ -22,8 +22,7 @@ using UserPtr = std::shared_ptr<User>;
 
 namespace drogon::user
 {
-	using IdGenerator = std::function<void (std::string& id)>;
-	using IdEncoder = std::function<void (std::string& idUnencoded)>;
+	using IdGenerator = std::function<std::string ()>;
 
 #ifdef ENABLE_OFFLINE_CALLBACK
 	/// This callback is called when a user object is to be destroyed in memory,
@@ -131,8 +130,7 @@ namespace drogon::user
 		double userCacheTimeout,
 		uint8_t idCookieUnencodedLen,
 		uint8_t idCookieEncodedLen,
-		IdGenerator&& idGenerator,
-		IdEncoder&& idEncoder
+		IdGenerator&& idGenerator
 	);
 	inline void configure(
 		std::string idCookieKey = "ID",
@@ -143,7 +141,7 @@ namespace drogon::user
 		bool secure = true,
 		double userCacheTimeout = 20.0)
 	{
-		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr, nullptr);
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, 0, 0, nullptr);
 	}
 	inline void configure(
 		std::string idCookieKey,
@@ -156,35 +154,7 @@ namespace drogon::user
 		uint8_t idCookieUnencodedLen,
 		IdGenerator&& idGenerator)
 	{
-		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), nullptr);
-	}
-	inline void configure(
-		std::string idCookieKey,
-		std::string userObjectKeyWithinFilters,
-		int idCookieMaxAge,
-		drogon::Cookie::SameSite sameSite,
-		bool httpOnly,
-		bool secure,
-		double userCacheTimeout,
-		uint8_t idCookieUnencodedLen,
-		uint8_t idCookieEncodedLen,
-		IdGenerator&& idGenerator)
-	{
-		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, idCookieEncodedLen, std::move(idGenerator), nullptr);
-	}
-	inline void configure(
-		std::string idCookieKey,
-		std::string userObjectKeyWithinFilters,
-		int idCookieMaxAge,
-		drogon::Cookie::SameSite sameSite,
-		bool httpOnly,
-		bool secure,
-		double userCacheTimeout,
-		uint8_t idCookieUnencodedLen,
-		IdGenerator&& idGenerator,
-		IdEncoder&& idEncoder)
-	{
-		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator), std::move(idEncoder));
+		configure(std::move(idCookieKey), std::move(userObjectKeyWithinFilters), idCookieMaxAge, sameSite, httpOnly, secure, userCacheTimeout, idCookieUnencodedLen, 0, std::move(idGenerator));
 	}
 
 	void configureDatabase(
