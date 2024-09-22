@@ -80,11 +80,17 @@ void user::configure(
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : []() -> string
 		{
-			string id(idLen_, uint8_t(0));
+			//string id(idLen_, uint8_t(0));
+			//utils::secureRandomBytes(id.data(), idUnencodedLen_);
+			//utils::base64Encode(
+			//	(const unsigned char*)id.data(), idLen_,
+			//	(unsigned char*)id.data(),
+			//	true/* URL safe */, false/* Unpadded */
+			//);
+			string id(idUnencodedLen_, uint8_t(0));
 			utils::secureRandomBytes(id.data(), idUnencodedLen_);
-			utils::base64Encode(
-				(const unsigned char*)id.data(), idLen_,
-				(unsigned char*)id.data(),
+			id = utils::base64Encode(
+				id,
 				true/* URL safe */, false/* Unpadded */
 			);
 			return id;
