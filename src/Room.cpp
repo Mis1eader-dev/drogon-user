@@ -217,44 +217,42 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 	{
 		scoped_lock lock(user->mutex_);
 		user->conns_[this].insert(conn);
+		return user;
 	}
-	else
+
+	user = User::get(id);
+	if(!user) // Unavailable anywhere
+		return User::create(id, conn, this);
+
+	// Available in memory
+	id = user->id(); // Pointer copy
+
 	{
-		user = User::get(id);
-		if(user) // Available in memory
+		scoped_lock lock(::timeoutsMutex_);
+		auto find = ::timeouts_.find(id);
+		if(find != ::timeouts_.end())
 		{
-			// Pointer copy
-			id = user->id();
-
-			{
-				scoped_lock lock(::timeoutsMutex_);
-				auto find = ::timeouts_.find(id);
-				if(find != ::timeouts_.end())
-				{
-					drogon::app().getLoop()->invalidateTimer(find->second);
-					::timeouts_.erase(find);
-				}
-			}
-
-			{
-				scoped_lock lock(user->mutex_);
-				user->conns_.emplace(
-					this,
-					User::ConnsSet
-					{
-						conn
-					}
-				);
-			}
-
-			scoped_lock lock(mutex_);
-			users_.emplace(id, user);
+			drogon::app().getLoop()->invalidateTimer(find->second);
+			::timeouts_.erase(find);
 		}
-		else // Unavailable anywhere
-			user = User::create(id, conn, this);
 	}
 
-	conn->setContext(user);
+	{
+		scoped_lock lock(user->mutex_);
+		user->conns_.emplace(
+			this,
+			User::ConnsSet
+			{
+				conn
+			}
+		);
+	}
+
+	{
+		scoped_lock lock(mutex_);
+		users_.emplace(id, user);
+	}
+
 	return user;
 }
 
