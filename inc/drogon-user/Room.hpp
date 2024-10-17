@@ -36,9 +36,11 @@ struct Message
 struct Disconnect
 {
 	UserPtr&& user;
+	const drogon::WebSocketConnectionPtr conn;
 
-	Disconnect(UserPtr&& user) :
-		user(std::move(user))
+	Disconnect(UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
+		user(std::move(user)),
+		conn(std::move(conn))
 	{}
 };
 

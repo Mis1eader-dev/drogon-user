@@ -75,7 +75,7 @@ public:
 		UserPtr user = room_.remove(conn);
 		if(!user)
 			return;
-		Disconnect disconnect(std::move(user));
+		Disconnect disconnect(std::move(user), std::move(conn));
 		onDisconnect(std::move(disconnect));
 	}
 
