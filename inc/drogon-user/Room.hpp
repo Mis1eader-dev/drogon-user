@@ -9,38 +9,35 @@
 #include <string_view>
 #include <unordered_map>
 
-struct Connect
+struct Connect : public User::WebSocketConnectionContextable
 {
-	UserPtr&& user;
-	const drogon::WebSocketConnectionPtr conn;
+	const UserPtr user;
 
-	Connect(UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
-		user(std::move(user)),
-		conn(std::move(conn))
+	Connect(UserPtr&& user, const drogon::WebSocketConnectionPtr& conn) :
+		User::WebSocketConnectionContextable(conn),
+		user(std::move(user))
 	{}
 };
 
-struct Message
+struct Message : public User::WebSocketConnectionContextable
 {
+	const UserPtr user;
 	std::string&& msg;
-	UserPtr&& user;
-	const drogon::WebSocketConnectionPtr conn;
 
-	Message(std::string&& msg, UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
-		msg(std::move(msg)),
+	Message(UserPtr&& user, const drogon::WebSocketConnectionPtr& conn, std::string&& msg) :
+		User::WebSocketConnectionContextable(conn),
 		user(std::move(user)),
-		conn(std::move(conn))
+		msg(std::move(msg))
 	{}
 };
 
-struct Disconnect
+struct Disconnect : public User::WebSocketConnectionContextable
 {
-	UserPtr&& user;
-	const drogon::WebSocketConnectionPtr conn;
+	const UserPtr user;
 
-	Disconnect(UserPtr&& user, drogon::WebSocketConnectionPtr conn) :
-		user(std::move(user)),
-		conn(std::move(conn))
+	Disconnect(UserPtr&& user, const drogon::WebSocketConnectionPtr& conn) :
+		User::WebSocketConnectionContextable(conn),
+		user(std::move(user))
 	{}
 };
 

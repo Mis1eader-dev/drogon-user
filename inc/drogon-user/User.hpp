@@ -303,9 +303,144 @@ public:
 	///
 	/// Otherwise it will be a global lookup of the user.
 	static UserPtr get(const drogon::HttpRequestPtr& req, bool extendLifespan = false);
+
+	struct WebSocketConnectionContextable;
+	struct WebSocketConnectionContext
+	{
+		const UserPtr user;
+		WebSocketConnectionContext(const UserPtr& user) :
+			user(user),
+			contextPtr_()
+		{}
+
+		/**
+		 * @brief Set custom data on the connection
+		 *
+		 * @param context The custom data.
+		 */
+		static void set(const drogon::WebSocketConnectionPtr& conn, const std::shared_ptr<void>& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
+		}
+
+		/**
+		 * @brief Set custom data on the connection
+		 *
+		 * @param context The custom data.
+		 */
+		static void set(const drogon::WebSocketConnectionPtr& conn, std::shared_ptr<void>&& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
+		}
+
+		/**
+		 * @brief Get custom data from the connection
+		 *
+		 * @tparam T The type of the data
+		 * @return std::shared_ptr<T> The smart pointer to the data object.
+		 */
+		template<typename T>
+		static std::shared_ptr<T> get(const drogon::WebSocketConnectionPtr& conn)
+		{
+			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
+		}
+
+		/**
+		 * @brief Get the custom data reference from the connection.
+		 * @note Please make sure that the context is available.
+		 * @tparam T The type of the data stored in the context.
+		 * @return T&
+		 */
+		template<typename T>
+		static T& getRef(const drogon::WebSocketConnectionPtr& conn)
+		{
+			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
+		}
+
+		/// Return true if the context is set by user.
+		static bool exists(const drogon::WebSocketConnectionPtr& conn)
+		{
+			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
+		}
+
+		/// Clear the context.
+		static void clear(const drogon::WebSocketConnectionPtr& conn)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
+		}
+
+	private:
+		std::shared_ptr<void> contextPtr_;
+
+		friend class WebSocketConnectionContextable;
+	};
+	using WebSocketConnectionContextPtr = std::shared_ptr<WebSocketConnectionContext>;
+	struct WebSocketConnectionContextable
+	{
+		const drogon::WebSocketConnectionPtr conn;
+		WebSocketConnectionContextable(const drogon::WebSocketConnectionPtr& conn) :
+			conn(conn)
+		{}
+
+		/**
+		 * @brief Set custom data on the connection
+		 *
+		 * @param context The custom data.
+		 */
+		void setContext(const std::shared_ptr<void>& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
+		}
+
+		/**
+		 * @brief Set custom data on the connection
+		 *
+		 * @param context The custom data.
+		 */
+		void setContext(std::shared_ptr<void>&& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
+		}
+
+		/**
+		 * @brief Get custom data from the connection
+		 *
+		 * @tparam T The type of the data
+		 * @return std::shared_ptr<T> The smart pointer to the data object.
+		 */
+		template<typename T>
+		std::shared_ptr<T> getContext() const
+		{
+			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
+		}
+
+		/**
+		 * @brief Get the custom data reference from the connection.
+		 * @note Please make sure that the context is available.
+		 * @tparam T The type of the data stored in the context.
+		 * @return T&
+		 */
+		template<typename T>
+		T& getContextRef() const
+		{
+			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
+		}
+
+		/// Return true if the context is set by user.
+		bool hasContext()
+		{
+			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
+		}
+
+		/// Clear the context.
+		void clearContext()
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
+		}
+	};
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
-		return conn->getContext<User>();
+		return conn->getContext<WebSocketConnectionContext>()->user;
 	}
 
 	inline std::string_view id() const

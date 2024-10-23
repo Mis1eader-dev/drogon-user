@@ -253,7 +253,11 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 		users_.emplace(id, user);
 	}
 
-	conn->setContext(user);
+	conn->setContext(
+		std::make_shared<User::WebSocketConnectionContext>(
+			user
+		)
+	);
 
 	return user;
 }

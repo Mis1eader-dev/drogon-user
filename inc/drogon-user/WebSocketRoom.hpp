@@ -66,7 +66,7 @@ public:
 				return;
 		}
 
-		Message message(std::move(msg), std::move(room_.get(conn)), conn);
+		Message message(room_.get(conn), conn, std::move(msg));
 		onMessage(std::move(message));
 	}
 
@@ -75,7 +75,7 @@ public:
 		UserPtr user = room_.remove(conn);
 		if(!user)
 			return;
-		Disconnect disconnect(std::move(user), std::move(conn));
+		Disconnect disconnect(std::move(user), conn);
 		onDisconnect(std::move(disconnect));
 	}
 
