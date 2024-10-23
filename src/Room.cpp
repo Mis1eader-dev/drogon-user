@@ -253,6 +253,8 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 		users_.emplace(id, user);
 	}
 
+	conn->setContext(user);
+
 	return user;
 }
 
