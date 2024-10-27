@@ -100,11 +100,9 @@ static inline trantor::TimerId enqueuePurge(string_view id)
 void User::enqueueForPurge(string_view id)
 {
 	scoped_lock lock(::timeoutsMutex_);
-	::timeouts_.insert(
-		std::make_pair(
-			id,
-			enqueuePurge(id)
-		)
+	::timeouts_.emplace(
+		id,
+		enqueuePurge(id)
 	);
 }
 
