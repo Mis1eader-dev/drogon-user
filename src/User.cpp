@@ -547,14 +547,12 @@ void drogon::user::filter::page::UnloggedIn::doFilter(const HttpRequestPtr& req,
 
 /* User Class */
 
-User::User(string id) :
-	id_(std::move(id)),
+User::User(string_view id) :
+	id_(id),
 	conns_()
-{
-	enqueueForPurge(id_);
-}
-User::User(string id, const WebSocketConnectionPtr& conn, Room* room) :
-	id_(std::move(id)),
+{}
+User::User(string_view id, const WebSocketConnectionPtr& conn, Room* room) :
+	id_(id),
 	conns_({
 		{
 			room, {

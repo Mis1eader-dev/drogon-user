@@ -274,8 +274,6 @@ private:
 
 	static UserPtr create(std::string_view id, const drogon::WebSocketConnectionPtr& conn, Room* room);
 
-	static void enqueueForPurge(std::string_view id);
-
 	/// Extends the purge if it has already been enqueued for purging
 	///
 	/// NOTE: The id must come from the user object itself
@@ -287,8 +285,8 @@ private:
 	static void prolongPurges(const std::vector<std::string_view>& ids);
 
 public:
-	User(std::string id);
-	User(std::string id, const drogon::WebSocketConnectionPtr& conn, Room* room);
+	User(std::string_view id);
+	User(std::string_view id, const drogon::WebSocketConnectionPtr& conn, Room* room);
 
 	User(const User&) = delete;
 	User& operator = (const User&) = delete;

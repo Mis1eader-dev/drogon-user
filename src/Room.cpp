@@ -25,7 +25,7 @@ using std::shared_lock;
 static std::shared_mutex mutex_;
 static std::unordered_map<string_view, UserPtr> allUsers_;
 
-static std::shared_mutex timeoutsMutex_;
+static std::mutex timeoutsMutex_;
 static std::unordered_map<string_view, trantor::TimerId> timeouts_;
 
 namespace drogon::user
@@ -44,30 +44,6 @@ Room::Room() :
 Room::Room(std::unordered_map<std::string_view, UserPtr>&& users) :
 	users_(std::move(users))
 {}
-
-UserPtr User::create(string_view id)
-{
-	UserPtr user = std::make_shared<User>(string(id));
-	{
-		scoped_lock lock(::mutex_);
-		::allUsers_.emplace(user->id(), user);
-	}
-	return user;
-}
-UserPtr User::create(string_view id, const WebSocketConnectionPtr& conn, Room* room)
-{
-	UserPtr user = std::make_shared<User>(string(id), conn, room);
-	id = user->id();
-	{
-		scoped_lock lock(room->mutex_);
-		room->users_.emplace(id, user);
-	}
-	{
-		scoped_lock lock(::mutex_);
-		::allUsers_.emplace(id, user);
-	}
-	return user;
-}
 
 static inline trantor::TimerId enqueuePurge(string_view id)
 {
@@ -97,13 +73,33 @@ static inline trantor::TimerId enqueuePurge(string_view id)
 	);
 }
 
-void User::enqueueForPurge(string_view id)
+UserPtr User::create(string_view id)
 {
-	scoped_lock lock(::timeoutsMutex_);
-	::timeouts_.emplace(
-		id,
-		enqueuePurge(id)
-	);
+	UserPtr user = std::make_shared<User>(id);
+	id = user->id_;
+	{
+		scoped_lock lock(::mutex_);
+		::allUsers_.emplace(id, user);
+	}
+	{
+		scoped_lock lock(::timeoutsMutex_);
+		::timeouts_.emplace(id, ::enqueuePurge(id));
+	}
+	return user;
+}
+UserPtr User::create(string_view id, const WebSocketConnectionPtr& conn, Room* room)
+{
+	UserPtr user = std::make_shared<User>(id, conn, room);
+	id = user->id_;
+	{
+		scoped_lock lock(room->mutex_);
+		room->users_.emplace(id, user);
+	}
+	{
+		scoped_lock lock(::mutex_);
+		::allUsers_.emplace(id, user);
+	}
+	return user;
 }
 
 void User::prolongPurge(string_view id)
@@ -114,7 +110,7 @@ void User::prolongPurge(string_view id)
 		return;
 
 	drogon::app().getLoop()->invalidateTimer(find->second);
-	find->second = enqueuePurge(id);
+	find->second = ::enqueuePurge(id);
 }
 
 void User::prolongPurges(const std::vector<string_view>& ids)
@@ -130,7 +126,7 @@ void User::prolongPurges(const std::vector<string_view>& ids)
 			continue;
 
 		loop->invalidateTimer(find->second);
-		find->second = enqueuePurge(id);
+		find->second = ::enqueuePurge(id);
 	}
 }
 
@@ -151,30 +147,36 @@ void User::forceClose()
 		UserPtr user = get(id_);
 	#endif
 
+		std::vector<Room*> rooms;
 		{
 			scoped_lock lock(mutex_);
-			for(const auto& [_, conns] : conns_)
+			rooms.reserve(conns_.size());
+			for(const auto& [room, conns] : conns_)
+			{
 				manualClosures_ += conns.size();
+				rooms.emplace_back(room);
+			}
 
 			for(const auto& [_, conns] : conns_)
 				for(const WebSocketConnectionPtr& conn : conns)
 					conn->forceClose();
 
-			{ // wait until all disconnect callbacks have finished
-				std::unique_lock lock(manualClosuresMutex_);
-				manualClosuresCv_.wait(lock, [this]() -> bool
-				{
-					return manualClosures_ == 0;
-				});
-			}
-
-			for(const auto& [room, _] : conns_)
-			{
-				scoped_lock lock(room->mutex_);
-				room->users_.erase(id_);
-			}
-
 			conns_.clear();
+
+		}
+
+		{ // wait until all disconnect callbacks have finished
+			std::unique_lock lock(manualClosuresMutex_);
+			manualClosuresCv_.wait(lock, [this]() -> bool
+			{
+				return manualClosures_ == 0;
+			});
+		}
+
+		for(const auto& room : rooms)
+		{
+			scoped_lock lock(room->mutex_);
+			room->users_.erase(id_);
 		}
 
 		{
@@ -223,7 +225,7 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 		return User::create(id, conn, this);
 
 	// Available in memory
-	id = user->id(); // Pointer copy
+	id = user->id_; // Pointer copy
 
 	{
 		scoped_lock lock(::timeoutsMutex_);
@@ -286,7 +288,7 @@ UserPtr Room::remove(const UserPtr& user)
 	}
 	{
 		scoped_lock lock(mutex_);
-		users_.erase(user->id());
+		users_.erase(user->id_);
 	}
 	return user;
 }
@@ -300,12 +302,12 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 		return nullptr;
 	}
 
-	auto& mtx = user->mutex_;
 	auto& connsMap = user->conns_;
 
 	string_view id;
+	bool enqueueForPurge = false;
 	{
-		scoped_lock lock(mtx);
+		scoped_lock lock(user->mutex_);
 		auto find = connsMap.find(this);
 		if(find == connsMap.end())
 			return user;
@@ -313,17 +315,23 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 		auto& connsSet = find->second;
 		if(connsSet.size() == 1) // Final connection to room
 		{
-			id = user->id();
+			id = user->id_;
 			if(connsMap.size() == 1) // Final connection to server
 			{
 				connsMap.clear();
-				User::enqueueForPurge(id);
+				enqueueForPurge = true;
 			}
 			else
 				connsMap.erase(this);
 		}
 		else
 			connsSet.erase(conn);
+	}
+
+	if(enqueueForPurge)
+	{
+		std::scoped_lock lock(::timeoutsMutex_);
+		::timeouts_.emplace(id, ::enqueuePurge(id));
 	}
 
 	if(!id.empty())
