@@ -51,24 +51,32 @@ static inline trantor::TimerId enqueuePurge(string_view id)
 		user::userCacheTimeout_,
 		[id]()
 		{
+		#ifdef ENABLE_OFFLINE_CALLBACK
+			UserPtr user = nullptr;
 			{
-			#ifdef ENABLE_OFFLINE_CALLBACK
-				UserPtr user = User::get(id);
-			#endif
-
+				scoped_lock lock(::mutex_);
+				auto find = ::allUsers_.find(id);
+				if(find != ::allUsers_.end())
 				{
-					scoped_lock lock(::mutex_);
-					::allUsers_.erase(id);
+					user = find->second;
+					::allUsers_.erase(find);
 				}
+			}
+		#endif
 
-			#ifdef ENABLE_OFFLINE_CALLBACK
-				for(const auto& cb : user::offlineUserCallbacks_)
-					cb(user);
-			#endif
+			{
+				scoped_lock lock(::timeoutsMutex_);
+				::timeouts_.erase(id);
 			}
 
-			scoped_lock lock(::timeoutsMutex_);
-			::timeouts_.erase(id);
+		#ifdef ENABLE_OFFLINE_CALLBACK
+			for(const auto& cb : user::offlineUserCallbacks_)
+				cb(user);
+		#else
+			// Must happen after the timeout removal
+			scoped_lock lock(::mutex_);
+			::allUsers_.erase(id);
+		#endif
 		}
 	);
 }
@@ -144,7 +152,16 @@ void User::forceClose()
 
 	{
 	#ifdef ENABLE_OFFLINE_CALLBACK
-		UserPtr user = get(id_);
+		UserPtr user = nullptr;
+		{
+			scoped_lock lock(::mutex_);
+			auto find = ::allUsers_.find(id_);
+			if(find != ::allUsers_.end())
+			{
+				user = find->second;
+				::allUsers_.erase(find);
+			}
+		}
 	#endif
 
 		std::vector<Room*> rooms;
@@ -179,14 +196,13 @@ void User::forceClose()
 			room->users_.erase(id_);
 		}
 
-		{
-			scoped_lock lock(::mutex_);
-			::allUsers_.erase(id_);
-		}
-
 	#ifdef ENABLE_OFFLINE_CALLBACK
 		for(const auto& cb : user::offlineUserCallbacks_)
 			cb(user);
+	#else
+		// Must happen after the timeout removal
+		scoped_lock lock(::mutex_);
+		::allUsers_.erase(id_);
 	#endif
 	}
 }
