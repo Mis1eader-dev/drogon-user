@@ -385,20 +385,14 @@ public:
 		 *
 		 * @param context The custom data.
 		 */
-		void setContext(const std::shared_ptr<void>& context)
-		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
-		}
+		void setContext(const std::shared_ptr<void>& context);
 
 		/**
 		 * @brief Set custom data on the connection
 		 *
 		 * @param context The custom data.
 		 */
-		void setContext(std::shared_ptr<void>&& context)
-		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
-		}
+		void setContext(std::shared_ptr<void>&& context);
 
 		/**
 		 * @brief Get custom data from the connection
@@ -409,7 +403,12 @@ public:
 		template<typename T>
 		std::shared_ptr<T> getContext() const
 		{
-			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
+			std::unique_lock lock(initMutex_);
+			initCv_.wait(lock, [this]() -> bool
+			{
+				return hasContext();
+			});
+			return WebSocketConnectionContext::get<T>(conn);
 		}
 
 		/**
@@ -421,20 +420,29 @@ public:
 		template<typename T>
 		T& getContextRef() const
 		{
-			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
+			std::unique_lock lock(initMutex_);
+			initCv_.wait(lock, [this]() -> bool
+			{
+				return hasContext();
+			});
+			return WebSocketConnectionContext::getRef<T>(conn);
 		}
 
 		/// Return true if the context is set by user.
-		bool hasContext()
+		inline bool hasContext() const
 		{
-			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
+			return WebSocketConnectionContext::exists(conn);
 		}
 
 		/// Clear the context.
-		void clearContext()
+		inline void clearContext()
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
+			WebSocketConnectionContext::clear(conn);
 		}
+
+	private:
+		mutable std::condition_variable initCv_;
+		mutable std::mutex initMutex_;
 	};
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{

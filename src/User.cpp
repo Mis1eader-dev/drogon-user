@@ -591,3 +591,17 @@ void User::clearContext()
 {
 	contextPtr_.reset();
 }
+
+
+
+void User::WebSocketConnectionContextable::setContext(const std::shared_ptr<void>& context)
+{
+	WebSocketConnectionContext::set(conn, context);
+	initCv_.notify_all();
+}
+
+void User::WebSocketConnectionContextable::setContext(std::shared_ptr<void>&& context)
+{
+	WebSocketConnectionContext::set(conn, std::move(context));
+	initCv_.notify_all();
+}
