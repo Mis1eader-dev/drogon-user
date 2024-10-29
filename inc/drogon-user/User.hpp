@@ -444,9 +444,15 @@ public:
 		mutable std::condition_variable initCv_;
 		mutable std::mutex initMutex_;
 	};
+	/// Will try to get the UserPtr object associated with the connection.
+	/// If unable to obtain it via the context, it repolls a few times.
+	/// If exhausted the repolls, then just returns nullptr.
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
-		return conn->getContext<WebSocketConnectionContext>()->user;
+		bool hasContext;
+		for(uint8_t a = 0; !(hasContext = conn->hasContext()) && a < 10; ++a)
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		return hasContext ? conn->getContext<WebSocketConnectionContext>()->user : nullptr;
 	}
 
 	inline std::string_view id() const
