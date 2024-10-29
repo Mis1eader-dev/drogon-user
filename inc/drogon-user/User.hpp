@@ -311,6 +311,14 @@ public:
 			contextPtr_()
 		{}
 
+		static std::shared_ptr<WebSocketConnectionContext> Get(const drogon::WebSocketConnectionPtr& conn)
+		{
+			bool hasContext;
+			for(uint8_t a = 0; !(hasContext = conn->hasContext()) && a < 10; ++a)
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			return hasContext ? conn->getContext<WebSocketConnectionContext>() : nullptr;
+		}
+
 		/**
 		 * @brief Set custom data on the connection
 		 *
@@ -318,7 +326,11 @@ public:
 		 */
 		static void set(const drogon::WebSocketConnectionPtr& conn, const std::shared_ptr<void>& context)
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
+			if(auto ctx = Get(conn))
+			{
+				ctx->contextPtr_ = context;
+				ctx->initCv_.notify_all();
+			}
 		}
 
 		/**
@@ -328,7 +340,11 @@ public:
 		 */
 		static void set(const drogon::WebSocketConnectionPtr& conn, std::shared_ptr<void>&& context)
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
+			if(auto ctx = Get(conn))
+			{
+				ctx->contextPtr_ = std::move(context);
+				ctx->initCv_.notify_all();
+			}
 		}
 
 		/**
@@ -340,7 +356,9 @@ public:
 		template<typename T>
 		static std::shared_ptr<T> get(const drogon::WebSocketConnectionPtr& conn)
 		{
-			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
+			if(auto ctx = Get(conn))
+				return std::static_pointer_cast<T>(ctx->contextPtr_);
+			return nullptr;
 		}
 
 		/**
@@ -352,23 +370,31 @@ public:
 		template<typename T>
 		static T& getRef(const drogon::WebSocketConnectionPtr& conn)
 		{
-			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
+			if(auto ctx = Get(conn))
+				return *(static_cast<T*>(ctx->contextPtr_.get()));
+			return nullptr;
 		}
 
 		/// Return true if the context is set by user.
 		static bool exists(const drogon::WebSocketConnectionPtr& conn)
 		{
-			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
+			if(auto ctx = Get(conn))
+				return (bool)ctx->contextPtr_;
+			return false;
 		}
 
 		/// Clear the context.
 		static void clear(const drogon::WebSocketConnectionPtr& conn)
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
+			if(auto ctx = Get(conn))
+				ctx->contextPtr_.reset();
 		}
 
 	private:
 		std::shared_ptr<void> contextPtr_;
+
+		mutable std::condition_variable initCv_;
+		mutable std::mutex initMutex_;
 
 		friend class WebSocketConnectionContextable;
 	};
@@ -387,7 +413,7 @@ public:
 		 */
 		void setContext(const std::shared_ptr<void>& context)
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
+			WebSocketConnectionContext::set(conn, context);
 		}
 
 		/**
@@ -397,7 +423,7 @@ public:
 		 */
 		void setContext(std::shared_ptr<void>&& context)
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
+			WebSocketConnectionContext::set(conn, std::move(context));
 		}
 
 		/**
@@ -409,7 +435,7 @@ public:
 		template<typename T>
 		std::shared_ptr<T> getContext() const
 		{
-			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
+			return WebSocketConnectionContext::get<T>(conn);
 		}
 
 		/**
@@ -421,27 +447,26 @@ public:
 		template<typename T>
 		T& getContextRef() const
 		{
-			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
+			return WebSocketConnectionContext::getRef<T>(conn);
 		}
 
 		/// Return true if the context is set by user.
 		bool hasContext()
 		{
-			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
+			return WebSocketConnectionContext::exists(conn);
 		}
 
 		/// Clear the context.
 		void clearContext()
 		{
-			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
+			WebSocketConnectionContext::clear(conn);
 		}
 	};
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
-		bool hasContext;
-		for(uint8_t a = 0; !(hasContext = conn->hasContext()) && a < 10; ++a)
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		return hasContext ? conn->getContext<WebSocketConnectionContext>()->user : nullptr;
+		if(auto ctx = WebSocketConnectionContext::Get(conn))
+			return ctx->user;
+		return nullptr;
 	}
 
 	inline std::string_view id() const
