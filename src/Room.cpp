@@ -295,6 +295,9 @@ UserPtr Room::remove(const UserPtr& user)
 UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 {
 	UserPtr user = get(conn);
+	if(!user)
+		return nullptr;
+
 	if(user->manualClosures_ > 0)
 	{
 		--(user->manualClosures_);
