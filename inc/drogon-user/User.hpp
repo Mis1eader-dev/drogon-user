@@ -385,14 +385,20 @@ public:
 		 *
 		 * @param context The custom data.
 		 */
-		void setContext(const std::shared_ptr<void>& context);
+		void setContext(const std::shared_ptr<void>& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = context;
+		}
 
 		/**
 		 * @brief Set custom data on the connection
 		 *
 		 * @param context The custom data.
 		 */
-		void setContext(std::shared_ptr<void>&& context);
+		void setContext(std::shared_ptr<void>&& context)
+		{
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_ = std::move(context);
+		}
 
 		/**
 		 * @brief Get custom data from the connection
@@ -403,12 +409,7 @@ public:
 		template<typename T>
 		std::shared_ptr<T> getContext() const
 		{
-			std::unique_lock lock(initMutex_);
-			initCv_.wait(lock, [this]() -> bool
-			{
-				return hasContext();
-			});
-			return WebSocketConnectionContext::get<T>(conn);
+			return std::static_pointer_cast<T>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_);
 		}
 
 		/**
@@ -420,33 +421,21 @@ public:
 		template<typename T>
 		T& getContextRef() const
 		{
-			std::unique_lock lock(initMutex_);
-			initCv_.wait(lock, [this]() -> bool
-			{
-				return hasContext();
-			});
-			return WebSocketConnectionContext::getRef<T>(conn);
+			return *(static_cast<T*>(conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.get()));
 		}
 
 		/// Return true if the context is set by user.
-		inline bool hasContext() const
+		bool hasContext()
 		{
-			return WebSocketConnectionContext::exists(conn);
+			return (bool)conn->getContext<User::WebSocketConnectionContext>()->contextPtr_;
 		}
 
 		/// Clear the context.
-		inline void clearContext()
+		void clearContext()
 		{
-			WebSocketConnectionContext::clear(conn);
+			conn->getContext<User::WebSocketConnectionContext>()->contextPtr_.reset();
 		}
-
-	private:
-		mutable std::condition_variable initCv_;
-		mutable std::mutex initMutex_;
 	};
-	/// Will try to get the UserPtr object associated with the connection.
-	/// If unable to obtain it via the context, it repolls a few times.
-	/// If exhausted the repolls, then just returns nullptr.
 	static inline UserPtr get(const drogon::WebSocketConnectionPtr& conn)
 	{
 		bool hasContext;
