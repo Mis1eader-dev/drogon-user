@@ -233,14 +233,33 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 	{
 		scoped_lock lock(user->mutex_);
 		user->conns_[this].insert(conn);
+		conn->setContext(
+			std::make_shared<User::WebSocketConnectionContext>(
+				user
+			)
+		);
 		return user;
 	}
 
 	user = User::get(id);
 	if(!user) // Unavailable anywhere
-		return User::create(id, conn, this);
+	{
+		user = User::create(id, conn, this);
+		conn->setContext(
+			std::make_shared<User::WebSocketConnectionContext>(
+				user
+			)
+		);
+		return user;
+	}
 
 	// Available in memory
+	conn->setContext(
+		std::make_shared<User::WebSocketConnectionContext>(
+			user
+		)
+	);
+
 	id = user->id_; // Pointer copy
 
 	{
@@ -268,12 +287,6 @@ UserPtr Room::add(const HttpRequestPtr& req, const WebSocketConnectionPtr& conn)
 		scoped_lock lock(mutex_);
 		users_.emplace(id, user);
 	}
-
-	conn->setContext(
-		std::make_shared<User::WebSocketConnectionContext>(
-			user
-		)
-	);
 
 	return user;
 }
