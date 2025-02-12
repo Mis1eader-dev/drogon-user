@@ -335,8 +335,8 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 
 	if(user->manualClosures_ > 0)
 	{
-		--(user->manualClosures_);
-		user->manualClosuresCv_.notify_all();
+		if(--(user->manualClosures_) == 0)
+			user->manualClosuresCv_.notify_all();
 		return nullptr;
 	}
 
