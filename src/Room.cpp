@@ -70,6 +70,9 @@ static inline trantor::TimerId enqueuePurge(string_view id)
 			}
 
 		#ifdef ENABLE_OFFLINE_CALLBACK
+			if(!user)
+				return;
+
 			for(const auto& cb : user::offlineUserCallbacks_)
 				cb(user);
 		#else
@@ -197,6 +200,9 @@ void User::forceClose()
 		}
 
 	#ifdef ENABLE_OFFLINE_CALLBACK
+		if(!user)
+			return;
+
 		for(const auto& cb : user::offlineUserCallbacks_)
 			cb(user);
 	#else
