@@ -539,6 +539,7 @@ public:
 	/// Else, it returns groups.begin() only when the size of groups is exactly the predicate.
 	GroupPtr firstGroup(size_t sizePredicate = 0) const;
 
+	void addGroup(const GroupPtr& group);
 	void removeGroup(std::string_view id);
 
 	std::vector<GroupPtr> groups() const;
