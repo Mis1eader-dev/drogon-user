@@ -153,64 +153,91 @@ void User::forceClose()
 		}
 	}
 
+#ifdef ENABLE_OFFLINE_CALLBACK
+	UserPtr user = nullptr;
 	{
-	#ifdef ENABLE_OFFLINE_CALLBACK
-		UserPtr user = nullptr;
+		scoped_lock lock(::mutex_);
+		auto find = ::allUsers_.find(id_);
+		if(find != ::allUsers_.end())
 		{
-			scoped_lock lock(::mutex_);
-			auto find = ::allUsers_.find(id_);
-			if(find != ::allUsers_.end())
-			{
-				user = find->second;
-				::allUsers_.erase(find);
-			}
+			user = find->second;
+			::allUsers_.erase(find);
 		}
-	#endif
+	}
+#endif
 
-		std::vector<Room*> rooms;
+	std::vector<Room*> rooms;
+	{
+		scoped_lock lock(mutex_);
+		rooms.reserve(conns_.size());
+		for(const auto& [room, conns] : conns_)
 		{
-			scoped_lock lock(mutex_);
-			rooms.reserve(conns_.size());
-			for(const auto& [room, conns] : conns_)
-			{
-				manualClosures_ += conns.size();
-				rooms.emplace_back(room);
-			}
-
-			for(const auto& [_, conns] : conns_)
-				for(const WebSocketConnectionPtr& conn : conns)
-					conn->forceClose();
-
-			conns_.clear();
-
+			manualClosures_ += conns.size();
+			rooms.emplace_back(room);
 		}
 
-		{ // wait until all disconnect callbacks have finished
-			std::unique_lock lock(manualClosuresMutex_);
-			manualClosuresCv_.wait(lock, [this]() -> bool
-			{
-				return manualClosures_ == 0;
-			});
-		}
+		for(const auto& [_, conns] : conns_)
+			for(const WebSocketConnectionPtr& conn : conns)
+				conn->forceClose();
 
-		for(const auto& room : rooms)
+		conns_.clear();
+
+	}
+
+	{ // wait until all disconnect callbacks have finished
+		std::unique_lock lock(manualClosuresMutex_);
+		manualClosuresCv_.wait(lock, [this]() -> bool
 		{
-			scoped_lock lock(room->mutex_);
-			room->users_.erase(id_);
-		}
+			return manualClosures_ == 0;
+		});
+	}
 
-	#ifdef ENABLE_OFFLINE_CALLBACK
-		if(!user)
+	for(const auto& room : rooms)
+	{
+		scoped_lock lock(room->mutex_);
+		room->users_.erase(id_);
+	}
+
+#ifdef ENABLE_OFFLINE_CALLBACK
+	if(!user)
+		return;
+
+	for(const auto& cb : user::offlineUserCallbacks_)
+		cb(user);
+#else
+	// Must happen after the timeout removal
+	scoped_lock lock(::mutex_);
+	::allUsers_.erase(id_);
+#endif
+}
+
+void User::forceClose(Room* room)
+{
+	{
+		scoped_lock lock(mutex_);
+		auto find = conns_.find(room);
+		if(find == conns_.end())
 			return;
 
-		for(const auto& cb : user::offlineUserCallbacks_)
-			cb(user);
-	#else
-		// Must happen after the timeout removal
-		scoped_lock lock(::mutex_);
-		::allUsers_.erase(id_);
-	#endif
+		const auto& conns = find->second;
+		manualClosures_ += conns.size();
+		for(const WebSocketConnectionPtr& conn : conns)
+			conn->forceClose();
+
+		conns_.erase(find);
+
 	}
+
+	{ // wait until all disconnect callbacks have finished
+		std::unique_lock lock(manualClosuresMutex_);
+		manualClosuresCv_.wait(lock, [this]() -> bool
+		{
+			return manualClosures_ == 0;
+		});
+	}
+
+	scoped_lock lock(room->mutex_);
+	room->users_.erase(id_);
 }
 
 UserPtr User::get(string_view id, bool extendLifespan)

@@ -477,6 +477,9 @@ public:
 	/// Closes connections from all rooms
 	void forceClose();
 
+	/// Closes connections from a specified room
+	void forceClose(Room* room);
+
 	/**
 	 * @brief Set custom data on the connection
 	 *

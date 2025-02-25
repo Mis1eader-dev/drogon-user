@@ -281,4 +281,8 @@ public:
 	{
 		return room_;
 	}
+	static inline Room* roomPtr()
+	{
+		return &room_;
+	}
 };
