@@ -167,13 +167,25 @@ void user::configureDatabase(
 
 			authorizationPayload.remove_prefix(authorizationHeaderPrefixLen);
 
-			auto len = authorizationPayload.size();
-			if(utils::base64Decode(authorizationPayload.data(), len, (uint8_t*)authorizationPayload.data()) !=
-				utils::base64DecodedLength(len))
+			size_t len = 0;
+			while(authorizationPayload.ends_with('=') && ++len < 3) // maximum 2 padding chars
+				authorizationPayload.remove_suffix(sizeof('='));
+			if(len >= 3)
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 				return;
 			}
+
+			len = authorizationPayload.size();
+			size_t decodedLen = utils::base64DecodedLength(len);
+			if(utils::base64Decode(authorizationPayload.data(), len, (uint8_t*)authorizationPayload.data()) !=
+				decodedLen)
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
+
+			authorizationPayload.remove_suffix(len - decodedLen);
 
 			auto colonIdx = authorizationPayload.find(':');
 			if(colonIdx == string::npos)
