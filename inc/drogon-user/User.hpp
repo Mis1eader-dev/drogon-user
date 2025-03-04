@@ -22,6 +22,8 @@ using UserPtr = std::shared_ptr<User>;
 
 namespace drogon::user
 {
+	extern const std::string kAuthorizationHeaderKey;
+
 	using IdGenerator = std::function<std::string ()>;
 
 #ifdef ENABLE_OFFLINE_CALLBACK

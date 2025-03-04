@@ -31,6 +31,8 @@ namespace drogon::user
 {
 	extern double userCacheTimeout_;
 
+	const string kAuthorizationHeaderKey = "authorization"; // This is necessary because Drogon's map only accepts `const string&`
+
 #ifdef ENABLE_OFFLINE_CALLBACK
 	extern std::vector<OfflineUserCallback> offlineUserCallbacks_;
 #endif
@@ -80,13 +82,6 @@ void user::configure(
 	idGenerator_ = std::move(
 		idGenerator ? idGenerator : []() -> string
 		{
-			//string id(idLen_, uint8_t(0));
-			//utils::secureRandomBytes(id.data(), idUnencodedLen_);
-			//utils::base64Encode(
-			//	(const unsigned char*)id.data(), idLen_,
-			//	(unsigned char*)id.data(),
-			//	true/* URL safe */, false/* Unpadded */
-			//);
 			string id(idUnencodedLen_, uint8_t(0));
 			utils::secureRandomBytes(id.data(), idUnencodedLen_);
 			id = utils::base64Encode(
@@ -148,9 +143,16 @@ void user::configureDatabase(
 		]
 		(const HttpRequestPtr& req, std::function<void (const HttpResponsePtr&)>&& callback) -> void
 		{
-			string_view authorizationPayload = req->getHeader("Authorization");
-			auto len = authorizationPayload.size();
-			if(len < authorizationHeaderMinLen_)
+			const auto& headers = req->headers();
+			auto find = headers.find(kAuthorizationHeaderKey);
+			if(find == headers.end())
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
+
+			string_view authorizationPayload = find->second;
+			if(authorizationPayload.size() < authorizationHeaderMinLen_) // We will not check for maximum, it will be request max size
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
 				return;
@@ -165,8 +167,15 @@ void user::configureDatabase(
 
 			authorizationPayload.remove_prefix(authorizationHeaderPrefixLen);
 
-			string payload = utils::base64Decode(authorizationPayload);
-			auto colonIdx = payload.find(':');
+			auto len = authorizationPayload.size();
+			if(utils::base64Decode(authorizationPayload.data(), len, (uint8_t*)authorizationPayload.data()) !=
+				utils::base64DecodedLength(len))
+			{
+				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
+				return;
+			}
+
+			auto colonIdx = authorizationPayload.find(':');
 			if(colonIdx == string::npos)
 			{
 				callback(HttpResponse::newHttpResponse(k401Unauthorized, CT_NONE));
@@ -180,7 +189,6 @@ void user::configureDatabase(
 				return;
 			}
 
-			authorizationPayload = payload; // view
 			string_view identifier = authorizationPayload.substr(0, colonIdx);
 
 			authorizationPayload.remove_prefix(colonIdx + 1); // authorizationPayload = password
@@ -202,8 +210,8 @@ void user::configureDatabase(
 
 			taskQueue_.runTaskInQueue(
 			[
-				req = std::move(req),
-				identifier,
+				req = std::move(req), // request will contain the modified auth header, views will still point to valid memory address
+				identifier = std::move(identifier),
 				password = std::move(authorizationPayload), // authorizationPayload = password
 				extraContext = std::move(extraContext),
 				callback = std::move(callback),
