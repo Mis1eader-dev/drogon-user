@@ -41,6 +41,15 @@ struct Disconnect : public User::WebSocketConnectionContextable
 	{}
 };
 
+/*struct Death
+{
+	const UserPtr user;
+
+	Death(UserPtr&& user) :
+		user(std::move(user))
+	{}
+};*/
+
 class Room
 {
 private:

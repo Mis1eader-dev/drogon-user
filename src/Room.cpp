@@ -364,7 +364,7 @@ UserPtr Room::remove(const WebSocketConnectionPtr& conn)
 	{
 		if(--(user->manualClosures_) == 0)
 			user->manualClosuresCv_.notify_all();
-		return nullptr;
+		return user;
 	}
 
 	auto& connsMap = user->conns_;

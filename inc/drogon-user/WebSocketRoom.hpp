@@ -4,9 +4,7 @@
 #include "drogon/WebSocketConnection.h"
 #include "drogon/WebSocketController.h"
 #include "drogon-user/Room.hpp"
-// #include "Room.hpp"
 #include "drogon-user/User.hpp"
-// #include "User.hpp"
 #include <json/value.h>
 #include <string>
 #include <string_view>
@@ -32,7 +30,7 @@ public:
 
 	virtual void onDisconnect(Disconnect&& disconnect) {}
 
-	// virtual void onEmpty() {}
+	// virtual void onDeath(Death&& death) {}
 
 
 
@@ -79,6 +77,12 @@ public:
 		UserPtr user = room_.remove(conn);
 		if(!user)
 			return;
+
+		/*if(isLast)
+		{
+			Death death(user);
+			onDeath(std::move(death));
+		}*/
 
 		Disconnect disconnect(std::move(user), conn);
 		onDisconnect(std::move(disconnect));
