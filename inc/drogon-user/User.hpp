@@ -202,6 +202,16 @@ namespace drogon::user
 	void registerOfflineUserCallback(OfflineUserCallback&& cb);
 #endif
 
+	/// Only valid after calling configure()
+	///
+	/// Returns the final encoded length
+	uint8_t getIdLen();
+
+	/// Only valid after calling configure()
+	///
+	/// Returns the byte length before encoding
+	uint8_t getIdUnencodedLen();
+
 	std::string generateId();
 	void generateIdFor(const drogon::HttpResponsePtr& resp, std::string id);
 	inline void generateIdFor(const drogon::HttpResponsePtr& resp)

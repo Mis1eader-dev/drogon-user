@@ -324,6 +324,15 @@ void user::registerOfflineUserCallback(OfflineUserCallback&& cb)
 }
 #endif
 
+uint8_t user::getIdLen()
+{
+	return idLen_;
+}
+uint8_t user::getIdUnencodedLen()
+{
+	return idUnencodedLen_;
+}
+
 string user::generateId()
 {
 	return idGenerator_();
